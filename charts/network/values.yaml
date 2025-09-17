@@ -1,14 +1,16 @@
 # This parent chart does not define additional values; override subchart defaults here when packaging composite releases.
 
+# -- (object) Global configuration shared across subcharts.
 global:
+  # -- (object) Defaults consumed by Besu network node workloads.
   networkNodes:
-    # Default Kubernetes Service name fronting validator pods; customise to keep bootstrapper outputs in sync with node manifests.
+    # -- (string) Kubernetes Service name fronting validator pods to align bootstrapper static-nodes output.
     serviceName: besu-node
-    # Default StatefulSet prefix used for validator pod hostnames.
+    # -- (string) StatefulSet prefix used for validator pod hostnames.
     podPrefix: besu-node-validator
-    # Default ConfigMap name storing the generated genesis.json artifact.
+    # -- (string) ConfigMap name storing the generated genesis.json artifact.
     genesisConfigMapName: besu-genesis
-    # Default ConfigMap name storing static-nodes.json entries.
+    # -- (string) ConfigMap name storing static-nodes.json entries.
     staticNodesConfigMapName: besu-static-nodes
-    # Default prefix used for faucet ConfigMaps and Secrets.
+    # -- (string) Prefix used for faucet ConfigMaps and Secrets.
     faucetArtifactPrefix: besu-faucet
