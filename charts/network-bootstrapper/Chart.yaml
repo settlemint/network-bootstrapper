@@ -1,3 +1,4 @@
+# yamllint disable rule:empty-lines
 apiVersion: v2
 name: network-bootstrapper
 description: A Helm chart for Kubernetes
