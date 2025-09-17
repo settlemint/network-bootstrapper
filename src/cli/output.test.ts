@@ -75,10 +75,9 @@ const PRIVATE_KEY_HEX_LENGTH = 64;
 const PUBLIC_KEY_HEX_LENGTH = 128;
 const HEX_RADIX = 16;
 const SAMPLE_VALIDATOR_INDEX = 1;
-const SAMPLE_RPC_INDEX = 2;
 const SAMPLE_FAUCET_INDEX = 99;
-const EXPECTED_CONFIGMAP_COUNT = 9;
-const EXPECTED_SECRET_COUNT = 3;
+const EXPECTED_CONFIGMAP_COUNT = 6;
+const EXPECTED_SECRET_COUNT = 2;
 const HEX_PREFIX_PATTERN = /^0x/;
 const TEST_CHAIN_ID = 1;
 const HTTP_CONFLICT_STATUS = 409;
@@ -103,7 +102,6 @@ const sampleNode = (index: number): IndexedNode => {
 const samplePayload: OutputPayload = {
   faucet: sampleNode(SAMPLE_FAUCET_INDEX),
   genesis: { config: { chainId: TEST_CHAIN_ID }, extraData: "0xabc" },
-  rpcNodes: [sampleNode(SAMPLE_RPC_INDEX)],
   validators: [sampleNode(SAMPLE_VALIDATOR_INDEX)],
 };
 
@@ -134,10 +132,6 @@ describe("outputResult", () => {
         "besu-faucet-enode",
         "besu-faucet-private-key",
         "besu-faucet-pubkey",
-        "besu-node-rpc-node-2-address",
-        "besu-node-rpc-node-2-enode",
-        "besu-node-rpc-node-2-private-key",
-        "besu-node-rpc-node-2-pubkey",
         "besu-node-validator-1-address",
         "besu-node-validator-1-enode",
         "besu-node-validator-1-private-key",
@@ -241,7 +235,6 @@ describe("outputResult", () => {
       const secretNames = createdSecrets.map((entry) => entry.name).sort();
       expect(secretNames).toEqual([
         "besu-faucet-private-key",
-        "besu-node-rpc-node-2-private-key",
         "besu-node-validator-1-private-key",
       ]);
       const privateKeySecret = createdSecrets.find((entry) =>

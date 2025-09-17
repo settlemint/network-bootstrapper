@@ -25,7 +25,6 @@ type CliOptions = {
   evmStackSize?: number;
   gasLimit?: string;
   gasPrice?: number;
-  rpcNodes?: number;
   validators?: number;
   outputType?: OutputType;
   secondsPerBlock?: number;
@@ -41,7 +40,6 @@ type BootstrapDependencies = {
 };
 
 const DEFAULT_VALIDATOR_COUNT = 4;
-const DEFAULT_RPC_COUNT = 2;
 const OUTPUT_CHOICES: OutputType[] = ["screen", "file", "kubernetes"];
 
 // Normalizes CLI inputs wrapped by orchestrators that keep literal quotes.
@@ -110,7 +108,6 @@ const runBootstrap = async (
     gasLimit,
     gasPrice,
     outputType,
-    rpcNodes: rpcNodeOption,
     secondsPerBlock,
     validators: validatorOption,
   } = options;
@@ -134,14 +131,8 @@ const runBootstrap = async (
     validatorOption,
     DEFAULT_VALIDATOR_COUNT
   );
-  const rpcNodeCount = await resolveCount(
-    "RPC nodes",
-    rpcNodeOption,
-    DEFAULT_RPC_COUNT
-  );
 
   const validators = generateGroup(deps.factory, validatorsCount);
-  const rpcNodes = generateGroup(deps.factory, rpcNodeCount);
   const faucet = deps.factory.generate();
 
   const validatorAddresses = validators.map<HexAddress>((node) => node.address);
@@ -171,7 +162,6 @@ const runBootstrap = async (
   const payload: OutputPayload = {
     faucet,
     genesis,
-    rpcNodes,
     validators,
   };
 
@@ -196,20 +186,21 @@ const createCliCommand = (
 
   command
     .name("network-bootstrapper")
+    .description("Utilities for configuring Besu-based networks.");
+
+  // Keep the root command free of options so future subcommands can compose alongside generate.
+  const generate = command
+    .command("generate")
     .description(
       "Generate node identities, configure consensus, and emit a Besu genesis."
-    )
+    );
+
+  generate
     .option(
       "-v, --validators <count>",
       "Number of validator nodes to generate.",
       createCountParser("Validators"),
       DEFAULT_VALIDATOR_COUNT
-    )
-    .option(
-      "-r, --rpc-nodes <count>",
-      "Number of RPC nodes to generate.",
-      createCountParser("RPC nodes"),
-      DEFAULT_RPC_COUNT
     )
     .option(
       "-a, --allocations <file>",
@@ -282,31 +273,26 @@ const createCliCommand = (
     .option(
       "--accept-defaults",
       "Accept default values for all prompts when CLI flags are omitted. (default: disabled)"
-    );
+    )
+    .action(async (options: CliOptions, cmd: Command) => {
+      const normalizedOptions: CliOptions = {
+        ...options,
+        validators:
+          cmd.getOptionValueSource("validators") === "default"
+            ? undefined
+            : options.validators,
+      };
 
-  command.action(async (options: CliOptions, cmd: Command) => {
-    const normalizedOptions: CliOptions = {
-      ...options,
-      validators:
-        cmd.getOptionValueSource("validators") === "default"
-          ? undefined
-          : options.validators,
-      rpcNodes:
-        cmd.getOptionValueSource("rpcNodes") === "default"
-          ? undefined
-          : options.rpcNodes,
-    };
+      const sanitizedOptions: CliOptions = {
+        ...normalizedOptions,
+        allocations:
+          normalizedOptions.allocations === undefined
+            ? undefined
+            : stripSurroundingQuotes(normalizedOptions.allocations),
+      };
 
-    const sanitizedOptions: CliOptions = {
-      ...normalizedOptions,
-      allocations:
-        normalizedOptions.allocations === undefined
-          ? undefined
-          : stripSurroundingQuotes(normalizedOptions.allocations),
-    };
-
-    await runBootstrap(sanitizedOptions, deps);
-  });
+      await runBootstrap(sanitizedOptions, deps);
+    });
 
   return command;
 };

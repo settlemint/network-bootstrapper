@@ -10,12 +10,9 @@ import type { OutputPayload, OutputType } from "./output.ts";
 import { outputResult as realOutputResult } from "./output.ts";
 
 const VALIDATOR_LABEL = "validator nodes";
-const RPC_LABEL = "RPC nodes";
 const VALIDATOR_RETURN = 2;
-const RPC_RETURN = 1;
 const GENESIS_MARKER = '"extraData": "0xextra"';
 const EXPECTED_DEFAULT_VALIDATOR = 4;
-const EXPECTED_DEFAULT_RPC = 2;
 const HEX_RADIX = 16;
 const PAD_WIDTH = 2;
 const PAD_CHAR = "0";
@@ -24,8 +21,7 @@ const PRIVATE_KEY_REPEAT = 32;
 const PUBLIC_KEY_REPEAT = 64;
 const FIRST_VALIDATOR_INDEX = 1;
 const SECOND_VALIDATOR_INDEX = 2;
-const FAUCET_INDEX = 4;
-const CLI_FAUCET_INDEX = 3;
+const FAUCET_INDEX = VALIDATOR_RETURN + 1;
 const createFactoryStub = () => {
   let counter = 0;
   return {
@@ -92,10 +88,7 @@ describe("CLI command bootstrap", () => {
       factory,
       promptForCount: (label, provided, defaultValue) => {
         promptCalls.push([label, provided, defaultValue]);
-        const value = label.startsWith("validator")
-          ? VALIDATOR_RETURN
-          : RPC_RETURN;
-        return Promise.resolve(value);
+        return Promise.resolve(VALIDATOR_RETURN);
       },
       promptForGenesis: (
         _service,
@@ -155,12 +148,10 @@ describe("CLI command bootstrap", () => {
 
     expect(promptCalls).toEqual([
       [VALIDATOR_LABEL, undefined, EXPECTED_DEFAULT_VALIDATOR],
-      [RPC_LABEL, undefined, EXPECTED_DEFAULT_RPC],
     ]);
     const output = stdout.read();
     expect(output).toContain("Genesis");
     expect(output).toContain("Validator Nodes");
-    expect(output).toContain("RPC Nodes");
     expect(output).toContain(GENESIS_MARKER);
     expect(loadAllocationsPath).toBe("/tmp/alloc.json");
     expect(outputInvocation?.type).toBe("screen");
@@ -194,7 +185,7 @@ describe("CLI command bootstrap", () => {
           algorithm: preset?.algorithm ?? ALGORITHM.QBFT,
           config: {
             chainId: preset?.chainId ?? 1,
-            faucetWalletAddress: expectedAddress(CLI_FAUCET_INDEX),
+            faucetWalletAddress: expectedAddress(VALIDATOR_RETURN + 1),
             gasLimit: "0x1",
             secondsPerBlock: preset?.secondsPerBlock ?? 1,
             gasPrice: preset?.gasPrice ?? 0,
@@ -215,10 +206,9 @@ describe("CLI command bootstrap", () => {
       [
         "node",
         "cli",
+        "generate",
         "--validators",
         "2",
-        "--rpc-nodes",
-        "1",
         "--allocations",
         "/tmp/mock.json",
         "--consensus",
@@ -246,6 +236,8 @@ describe("CLI command bootstrap", () => {
 
   test("runBootstrap bypasses genesis prompts when CLI overrides provided", async () => {
     const factory = createFactoryStub();
+    const validatorOverride = 1;
+
     const deps: BootstrapDependencies = {
       factory,
       promptForCount: (_label, provided) => {
@@ -271,7 +263,7 @@ describe("CLI command bootstrap", () => {
           algorithm: ALGORITHM.IBFTv2,
           config: {
             chainId: 1234,
-            faucetWalletAddress: expectedAddress(CLI_FAUCET_INDEX),
+            faucetWalletAddress: expectedAddress(validatorOverride + 1),
             gasLimit: "0x1",
             secondsPerBlock: 6,
           },
@@ -287,8 +279,7 @@ describe("CLI command bootstrap", () => {
     };
 
     const options: CliOptions = {
-      validators: 1,
-      rpcNodes: 1,
+      validators: validatorOverride,
       consensus: ALGORITHM.IBFTv2,
       chainId: 1234,
       secondsPerBlock: 6,
@@ -305,8 +296,11 @@ describe("CLI command bootstrap", () => {
     const shouldReject = async (args: string[], message: string) => {
       const command = createCliCommand();
       command.exitOverride();
+      for (const child of command.commands) {
+        child.exitOverride();
+      }
       await expect(
-        command.parseAsync(["node", "cli", ...args])
+        command.parseAsync(["node", "cli", "generate", ...args])
       ).rejects.toThrow(message);
     };
 
@@ -331,8 +325,11 @@ describe("CLI command bootstrap", () => {
   test("createCliCommand rejects unsupported output type", async () => {
     const command = createCliCommand();
     command.exitOverride();
+    for (const child of command.commands) {
+      child.exitOverride();
+    }
     await expect(
-      command.parseAsync(["node", "cli", "--outputType", "invalid"])
+      command.parseAsync(["node", "cli", "generate", "--outputType", "invalid"])
     ).rejects.toThrow(
       `Output type must be one of: ${["screen", "file", "kubernetes"].join(", ")}.`
     );
@@ -347,7 +344,7 @@ describe("CLI command bootstrap", () => {
         algorithm: ALGORITHM.QBFT,
         config: {
           chainId: 1,
-          faucetWalletAddress: expectedAddress(CLI_FAUCET_INDEX),
+          faucetWalletAddress: expectedAddress(EXPECTED_DEFAULT_VALIDATOR + 1),
           gasLimit: "0x1",
           gasPrice: 0,
           secondsPerBlock: 2,
@@ -364,22 +361,38 @@ describe("CLI command bootstrap", () => {
     };
 
     const command = createCliCommand(deps);
+    const generate = command.commands.find(
+      (child) => child.name() === "generate"
+    );
+    expect(generate).toBeDefined();
     command.exitOverride();
+    for (const child of command.commands) {
+      child.exitOverride();
+    }
     await expect(
       command.parseAsync(
-        ["node", "cli", '--outputType="kubernetes"', "--accept-defaults"],
+        [
+          "node",
+          "cli",
+          "generate",
+          '--outputType="kubernetes"',
+          "--accept-defaults",
+        ],
         { from: "node" }
       )
     ).resolves.toBeDefined();
-    expect(command.opts().outputType).toBe("kubernetes");
+    expect(generate?.opts().outputType).toBe("kubernetes");
     expect(capturedOutputType).toBe("kubernetes");
   });
 
   test("createCliCommand rejects unsupported consensus", async () => {
     const command = createCliCommand();
     command.exitOverride();
+    for (const child of command.commands) {
+      child.exitOverride();
+    }
     await expect(
-      command.parseAsync(["node", "cli", "--consensus", "invalid"])
+      command.parseAsync(["node", "cli", "generate", "--consensus", "invalid"])
     ).rejects.toThrow(
       `Consensus must be one of: ${Object.values(ALGORITHM).join(", ")}.`
     );
@@ -413,7 +426,7 @@ describe("CLI command bootstrap", () => {
           config: {
             chainId: 1,
             faucetWalletAddress: expectedAddress(
-              EXPECTED_DEFAULT_VALIDATOR + EXPECTED_DEFAULT_RPC + 1
+              EXPECTED_DEFAULT_VALIDATOR + 1
             ),
             gasLimit: "0x1",
             secondsPerBlock: 2,
@@ -428,7 +441,6 @@ describe("CLI command bootstrap", () => {
       },
       outputResult: (_type, payload) => {
         expect(payload.validators).toHaveLength(EXPECTED_DEFAULT_VALIDATOR);
-        expect(payload.rpcNodes).toHaveLength(EXPECTED_DEFAULT_RPC);
         return Promise.resolve();
       },
     };

@@ -1,0 +1,15 @@
+apiVersion: v2
+name: network
+description: A Helm chart for a blockchain network on Kubernetes
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: SettleMint
+    email: support@settlemint.com
+    url: https://settlemint.com
+dependencies:
+  - name: network-bootstrapper
+    version: "*"
+  - name: network-nodes
+    version: "*"

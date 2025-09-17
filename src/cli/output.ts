@@ -13,7 +13,6 @@ type OutputType = "screen" | "file" | "kubernetes";
 type OutputPayload = {
   faucet: GeneratedNodeKey;
   genesis: unknown;
-  rpcNodes: readonly IndexedNode[];
   validators: readonly IndexedNode[];
 };
 
@@ -65,7 +64,6 @@ const outputToScreen = (payload: OutputPayload): void => {
   process.stdout.write("\n\n");
   printGenesis("Genesis", genesisJson);
   printGroup("Validator Nodes", payload.validators);
-  printGroup("RPC Nodes", payload.rpcNodes);
   printFaucet(payload.faucet);
 };
 
@@ -87,8 +85,7 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
   const directory = join(OUTPUT_DIR, timestamp);
   await mkdir(directory, { recursive: true });
 
-  const validatorSpecs = createSpecsForGroup("validator", payload.validators);
-  const rpcSpecs = createSpecsForGroup("rpc-node", payload.rpcNodes);
+  const validatorSpecs = createValidatorSpecs(payload.validators);
 
   const faucetSpecs: ConfigMapSpec[] = [
     {
@@ -118,7 +115,7 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
       join(directory, "genesis"),
       `${JSON.stringify(payload.genesis, null, 2)}\n`
     ),
-    ...[...validatorSpecs, ...rpcSpecs, ...faucetSpecs].map((spec) =>
+    ...[...validatorSpecs, ...faucetSpecs].map((spec) =>
       Bun.write(
         join(directory, spec.name),
         `${JSON.stringify({ [spec.key]: spec.value }, null, 2)}\n`
@@ -132,9 +129,8 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
 
 const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
   const { client, namespace } = await createKubernetesClient();
-  const validatorSpecs = createSpecsForGroup("validator", payload.validators);
-  const rpcSpecs = createSpecsForGroup("rpc-node", payload.rpcNodes);
-  const allSpecs = [...validatorSpecs, ...rpcSpecs];
+  const validatorSpecs = createValidatorSpecs(payload.validators);
+  const allSpecs = [...validatorSpecs];
   const configMapSpecs = [
     ...allSpecs.filter((spec) => spec.key !== "privateKey"),
     ...createFaucetConfigSpecs(payload.faucet),
@@ -159,15 +155,9 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
   );
 };
 
-const createSpecsForGroup = (
-  group: "validator" | "rpc-node",
-  nodes: readonly IndexedNode[]
-): ConfigMapSpec[] => {
-  const prefix =
-    group === "validator" ? "besu-node-validator" : "besu-node-rpc-node";
-
-  return nodes.flatMap<ConfigMapSpec>((node) => {
-    const base = `${prefix}-${node.index}`;
+const createValidatorSpecs = (nodes: readonly IndexedNode[]): ConfigMapSpec[] =>
+  nodes.flatMap<ConfigMapSpec>((node) => {
+    const base = `besu-node-validator-${node.index}`;
     return [
       { name: `${base}-address`, key: "address", value: node.address },
       {
@@ -179,7 +169,6 @@ const createSpecsForGroup = (
       { name: `${base}-pubkey`, key: "publicKey", value: node.publicKey },
     ];
   });
-};
 
 const createFaucetConfigSpecs = (faucet: GeneratedNodeKey): ConfigMapSpec[] => [
   { name: "besu-faucet-address", key: "address", value: faucet.address },

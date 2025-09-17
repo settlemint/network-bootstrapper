@@ -91,8 +91,6 @@ affinity: {}
 settings:
   # -- (int) Number of validator node definitions the bootstrapper generates. Default: 4.
   validators:
-  # -- (int) Number of RPC node definitions included in the output topology. Default: 2.
-  rpcNodes:
   # -- (string) Filesystem path, accessible to the job, pointing to a JSON file with initial account allocations. Omit to skip pre-funded accounts.
   allocations:
   # -- (string) Destination for generated artefacts: `screen` (stdout), `file` (write to volume), or `kubernetes` (persist as Kubernetes secrets/configmaps). Default: "screen".

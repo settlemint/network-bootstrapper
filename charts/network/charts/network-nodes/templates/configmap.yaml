@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nodes.fullname" . }}-config
+  labels:
+    {{- include "nodes.labels" . | nindent 4 }}
+{{- $persistence := .Values.persistence | default (dict) }}
+{{- $persistenceEnabled := default false (get $persistence "enabled") }}
+{{- $mountPath := default "" (get $persistence "mountPath") }}
+{{- $dataPath := default "/data" .Values.config.dataPath }}
+{{- if and $persistenceEnabled (ne $mountPath "") }}
+{{- $dataPath = $mountPath }}
+{{- end }}
+data:
+  config.toml: |
+    genesis-file = "/etc/besu/genesis.json"
+    logging = "{{ .Values.config.logging }}"
+    node-private-key-file = "/etc/besu/privatekey"
+    data-storage-format = "{{ .Values.config.dataStorageFormat }}"
+    bonsai-limit-trie-logs-enabled = {{ .Values.config.bonsaiLimitTrieLogsEnabled }}
+    data-path = "{{ $dataPath }}"
+    cache-last-blocks = {{ .Values.config.cacheLastBlocks }}
+    min-gas-price = {{ .Values.config.minGasPrice }}
+    tx-pool = "{{ .Values.config.txPool.type }}"
+    tx-pool-max-size = {{ .Values.config.txPool.maxSize }}
+    tx-pool-no-local-priority = {{ .Values.config.txPool.noLocalPriority }}
+    tx-pool-limit-by-account-percentage = {{ .Values.config.txPool.limitByAccountPercentage }}
+    tx-pool-enable-save-restore = {{ .Values.config.txPool.enableSaveRestore }}
+    p2p-enabled = {{ .Values.config.p2p.enabled }}
+    discovery-enabled = {{ .Values.config.p2p.discoveryEnabled }}
+    static-nodes-file = "{{ .Values.config.p2p.staticNodesFile }}"
+    p2p-interface = "{{ .Values.config.p2p.interface }}"
+    p2p-port = {{ .Values.service.ports.rlpx }}
+    max-peers = {{ .Values.config.p2p.maxPeers }}
+    rpc-tx-feecap = {{ .Values.config.rpc.txFeecap }}
+    sync-min-peers = {{ .Values.config.sync.minPeers }}
+    sync-mode = "{{ .Values.config.sync.mode }}"
+    remote-connections-limit-enabled = {{ .Values.config.remoteConnectionsLimitEnabled }}
+    random-peer-priority-enabled = {{ .Values.config.randomPeerPriorityEnabled }}
+    receipt-compaction-enabled = {{ .Values.config.receiptCompactionEnabled }}
+    host-allowlist = {{ mustToJson .Values.config.hostAllowlist }}
+    rpc-http-enabled = {{ .Values.config.http.enabled }}
+    rpc-http-host = "{{ .Values.config.http.host }}"
+    rpc-http-port = {{ .Values.service.ports.rpc }}
+    rpc-http-api = {{ mustToJson .Values.config.http.api }}
+    rpc-http-cors-origins = {{ mustToJson .Values.config.http.corsOrigins }}
+    rpc-http-authentication-enabled = {{ .Values.config.http.authenticationEnabled }}
+    revert-reason-enabled = {{ .Values.config.revertReasonEnabled }}
+    rpc-http-max-active-connections = {{ .Values.config.http.maxActiveConnections }}
+    rpc-ws-max-active-connections = {{ .Values.config.ws.maxActiveConnections }}
+    rpc-http-max-request-content-length = {{ .Values.config.http.maxRequestContentLength }}
+    rpc-ws-max-frame-size = {{ .Values.config.ws.maxFrameSize }}
+    rpc-http-max-batch-size = {{ .Values.config.http.maxBatchSize }}
+    graphql-http-enabled = {{ .Values.config.graphql.enabled }}
+    graphql-http-host = "{{ .Values.config.graphql.host }}"
+    graphql-http-port = {{ .Values.service.ports.graphql }}
+    graphql-http-cors-origins = {{ mustToJson .Values.config.graphql.corsOrigins }}
+    rpc-ws-enabled = {{ .Values.config.ws.enabled }}
+    rpc-ws-host = "{{ .Values.config.ws.host }}"
+    rpc-ws-port = {{ .Values.service.ports.ws }}
+    rpc-ws-api = {{ mustToJson .Values.config.ws.api }}
+    rpc-ws-authentication-enabled = {{ .Values.config.ws.authenticationEnabled }}
+    metrics-enabled = {{ .Values.config.metrics.enabled }}
+    metrics-host = "{{ .Values.config.metrics.host }}"
+    metrics-port = {{ .Values.service.ports.metrics }}
+    metrics-category = {{ mustToJson .Values.config.metrics.categories }}
