@@ -47,6 +47,7 @@ type UpdateResult = {
 };
 
 const toPosixPath = (value: string): string => value.replaceAll("\\", "/");
+const CHART_DEPENDENCY_RANGE = ">=0.0.0-0";
 
 async function scanFiles(
   pattern: string,
@@ -288,8 +289,8 @@ function updateChartDependencies(
 
   let dependencyCount = 0;
   for (const dep of dependencies) {
-    if (dep.version !== "*") {
-      dep.version = "*";
+    if (dep.version !== CHART_DEPENDENCY_RANGE) {
+      dep.version = CHART_DEPENDENCY_RANGE;
       dependencyCount++;
     }
   }
@@ -478,7 +479,7 @@ async function updateChartVersions(
               logs.push(
                 `Set ${dependencyUpdates} chart dependenc${
                   dependencyUpdates === 1 ? "y" : "ies"
-                } to "*"`
+                } to ${CHART_DEPENDENCY_RANGE}`
               );
             }
 

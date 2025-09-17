@@ -10,6 +10,6 @@ maintainers:
     url: https://settlemint.com
 dependencies:
   - name: network-bootstrapper
-    version: "*"
+    version: ">=0.0.0-0"
   - name: network-nodes
-    version: "*"
+    version: ">=0.0.0-0"

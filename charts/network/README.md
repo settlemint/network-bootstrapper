@@ -14,8 +14,8 @@ A Helm chart for a blockchain network on Kubernetes
 
 | Repository | Name | Version |
 |------------|------|---------|
-|  | network-bootstrapper | 1.0.1 |
-|  | network-nodes | 1.0.1 |
+|  | network-bootstrapper | >=0.0.0-0 |
+|  | network-nodes | >=0.0.0-0 |
 
 ## Values
 
