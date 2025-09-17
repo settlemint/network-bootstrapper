@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { getAddress } from "viem";
+import { ARTIFACT_DEFAULTS } from "../constants/artifact-defaults.ts";
 import type { BesuAllocAccount } from "../genesis/besu-genesis.service.ts";
 import { ALGORITHM } from "../genesis/besu-genesis.service.ts";
 import type { GeneratedNodeKey } from "../keys/node-key-factory.ts";
@@ -16,6 +17,13 @@ const EXPECTED_DEFAULT_VALIDATOR = 4;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
 const CUSTOM_STATIC_NODE_PORT = 40_000;
 const LEADING_DOT_REGEX = /^\./u;
+const {
+  staticNodeServiceName: DEFAULT_SERVICE_NAME,
+  staticNodePodPrefix: DEFAULT_POD_PREFIX,
+  genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
+  staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+  faucetArtifactPrefix: DEFAULT_FAUCET_PREFIX,
+} = ARTIFACT_DEFAULTS;
 const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
 const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
 const HEX_RADIX = 16;
@@ -46,6 +54,10 @@ const createFactoryStub = () => {
   };
 };
 
+const passthroughTextPrompt: BootstrapDependencies["promptForText"] = ({
+  defaultValue,
+}) => Promise.resolve(defaultValue);
+
 const expectedAddress = (index: number) => {
   const pattern = index.toString(HEX_RADIX).padStart(PAD_WIDTH, PAD_CHAR);
   return getAddress(`0x${pattern.repeat(ADDRESS_REPEAT)}`);
@@ -61,7 +73,9 @@ const expectedStaticNodeUri = (
   domain?: string,
   port: number = DEFAULT_STATIC_NODE_PORT,
   discoveryPort: number = DEFAULT_STATIC_NODE_PORT,
-  namespace?: string
+  namespace?: string,
+  serviceName: string = DEFAULT_SERVICE_NAME,
+  podPrefix: string = DEFAULT_POD_PREFIX
 ): string => {
   const normalizedDomain =
     domain === undefined || domain.trim().length === 0
@@ -72,8 +86,7 @@ const expectedStaticNodeUri = (
       ? undefined
       : namespace.trim();
   const ordinal = index - 1;
-  const podName = `besu-node-validator-${ordinal}`;
-  const serviceName = "besu-node";
+  const podName = `${podPrefix}-${ordinal}`;
   const segments = [podName, serviceName];
   if (normalizedNamespace) {
     segments.push(normalizedNamespace);
@@ -121,6 +134,7 @@ describe("CLI command bootstrap", () => {
   test("runBootstrap orchestrates prompts and writes genesis", async () => {
     const factory = createFactoryStub();
     const promptCalls: [string, number | undefined, number][] = [];
+    const textPromptCalls: [string, string][] = [];
     let loadAllocationsPath: string | undefined;
     let outputInvocation:
       | {
@@ -174,6 +188,10 @@ describe("CLI command bootstrap", () => {
           genesis: { config: {}, extraData: "0xextra" } as any,
         });
       },
+      promptForText: ({ labelText, defaultValue }) => {
+        textPromptCalls.push([labelText, defaultValue]);
+        return Promise.resolve(defaultValue);
+      },
       service: {} as any,
       loadAllocations: (path: string) => {
         loadAllocationsPath = path;
@@ -194,6 +212,13 @@ describe("CLI command bootstrap", () => {
     expect(promptCalls).toEqual([
       [VALIDATOR_LABEL, undefined, EXPECTED_DEFAULT_VALIDATOR],
     ]);
+    expect(textPromptCalls).toEqual([
+      ["Static node service name", DEFAULT_SERVICE_NAME],
+      ["Static node pod prefix", DEFAULT_POD_PREFIX],
+      ["Genesis ConfigMap name", DEFAULT_GENESIS_CONFIGMAP_NAME],
+      ["Static nodes ConfigMap name", DEFAULT_STATIC_NODES_CONFIGMAP_NAME],
+      ["Faucet artifact prefix", DEFAULT_FAUCET_PREFIX],
+    ]);
     const output = stdout.read();
     expect(output).toContain("Genesis");
     expect(output).toContain("Validator Nodes");
@@ -205,6 +230,12 @@ describe("CLI command bootstrap", () => {
       expectedStaticNodeUri(FIRST_VALIDATOR_INDEX),
       expectedStaticNodeUri(SECOND_VALIDATOR_INDEX),
     ]);
+    expect(outputInvocation?.payload.artifactNames).toEqual({
+      faucetPrefix: DEFAULT_FAUCET_PREFIX,
+      validatorPrefix: DEFAULT_POD_PREFIX,
+      genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
+      staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+    });
   });
 
   test("createCliCommand wires metadata", () => {
@@ -243,6 +274,7 @@ describe("CLI command bootstrap", () => {
           genesis: { config: {}, extraData: "0xextra" } as any,
         });
       },
+      promptForText: passthroughTextPrompt,
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
@@ -309,6 +341,7 @@ describe("CLI command bootstrap", () => {
           },
           genesis: { config: {}, extraData: "0xextra" } as any,
         }),
+      promptForText: passthroughTextPrompt,
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
@@ -334,6 +367,16 @@ describe("CLI command bootstrap", () => {
         "40000",
         "--static-node-discovery-port",
         "0",
+        "--static-node-service-name",
+        "custom-service",
+        "--static-node-pod-prefix",
+        "custom-validator",
+        "--genesis-configmap-name",
+        "custom-genesis",
+        "--static-nodes-configmap-name",
+        "custom-static-nodes",
+        "--faucet-artifact-prefix",
+        "custom-faucet",
       ],
       { from: "node" }
     );
@@ -344,9 +387,17 @@ describe("CLI command bootstrap", () => {
         "svc.cluster.local",
         CUSTOM_STATIC_NODE_PORT,
         0,
-        "network"
+        "network",
+        "custom-service",
+        "custom-validator"
       ),
     ]);
+    expect(capturedPayload?.artifactNames).toEqual({
+      faucetPrefix: "custom-faucet",
+      validatorPrefix: "custom-validator",
+      genesisConfigMapName: "custom-genesis",
+      staticNodesConfigMapName: "custom-static-nodes",
+    });
   });
 
   test("runBootstrap builds static nodes with domain and custom ports", async () => {
@@ -371,6 +422,7 @@ describe("CLI command bootstrap", () => {
           genesis: { config: {}, extraData: "0xextra" } as any,
         });
       },
+      promptForText: passthroughTextPrompt,
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
@@ -438,6 +490,7 @@ describe("CLI command bootstrap", () => {
           genesis: { config: {}, extraData: "0xextra" } as any,
         });
       },
+      promptForText: passthroughTextPrompt,
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
@@ -519,6 +572,7 @@ describe("CLI command bootstrap", () => {
         },
         genesis: { config: {}, extraData: "0x" } as any,
       }),
+      promptForText: passthroughTextPrompt,
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
@@ -602,6 +656,7 @@ describe("CLI command bootstrap", () => {
           genesis: { config: {}, extraData: "0xextra" } as any,
         });
       },
+      promptForText: passthroughTextPrompt,
       service: {} as any,
       loadAllocations: () => {
         loadAllocationsInvoked = true;
@@ -609,6 +664,12 @@ describe("CLI command bootstrap", () => {
       },
       outputResult: (_type, payload) => {
         expect(payload.validators).toHaveLength(EXPECTED_DEFAULT_VALIDATOR);
+        expect(payload.artifactNames).toEqual({
+          faucetPrefix: DEFAULT_FAUCET_PREFIX,
+          validatorPrefix: DEFAULT_POD_PREFIX,
+          genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
+          staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+        });
         return Promise.resolve();
       },
     };

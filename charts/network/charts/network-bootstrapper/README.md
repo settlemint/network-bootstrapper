@@ -48,14 +48,19 @@ A Helm chart for Kubernetes
 | settings.defaultStaticNodeDiscoveryPort | int | `30303` | Default UDP discovery port used in generated enode URIs when no override is provided. |
 | settings.defaultStaticNodePort | int | `30303` | Default TCP P2P port used in generated enode URIs when no override is provided. |
 | settings.evmStackSize | int | `nil` | Maximum EVM stack size permitted for contract execution. |
+| settings.faucetArtifactPrefix | string | `nil` | Prefix used for faucet ConfigMaps and Secrets. |
 | settings.gasLimit | int | `nil` | Genesis block gas limit expressed as a decimal number. |
 | settings.gasPrice | int | `nil` | Base gas price in wei applied across the network. |
+| settings.genesisConfigMapName | string | `nil` | ConfigMap name storing the generated genesis.json payload. |
 | settings.outputType | string | `"kubernetes"` | Output target for generated artefacts: screen, file, or kubernetes. |
 | settings.secondsPerBlock | int | `nil` | Block interval in seconds for the genesis configuration. |
 | settings.staticNodeDiscoveryPort | int | `nil` | UDP discovery port embedded in static node enode URIs. |
 | settings.staticNodeDomain | string | `nil` | DNS suffix appended to generated static node hostnames. |
 | settings.staticNodeNamespace | string | `nil` | Namespace component inserted between service name and domain in static node hostnames. |
+| settings.staticNodePodPrefix | string | `nil` | StatefulSet prefix applied to validator pod hostnames. |
 | settings.staticNodePort | int | `nil` | TCP P2P port embedded in static node enode URIs. |
+| settings.staticNodeServiceName | string | `nil` | Headless Service name used when constructing static node hostnames. |
+| settings.staticNodesConfigMapName | string | `nil` | ConfigMap name storing the generated static-nodes.json payload. |
 | settings.validators | int | `nil` | Number of validator identities to generate (default 4). |
 | tolerations | list | `[]` | Tolerations allowing the bootstrapper pod onto tainted nodes. |
 | volumeMounts | list | `[]` | Extra volume mounts applied to the bootstrapper container. |

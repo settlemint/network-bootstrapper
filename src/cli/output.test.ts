@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { type CoreV1Api, KubeConfig } from "@kubernetes/client-node";
 
+import { ARTIFACT_DEFAULTS } from "../constants/artifact-defaults.ts";
 import type { IndexedNode, OutputPayload, OutputType } from "./output.ts";
 import {
   outputResult,
@@ -86,10 +87,80 @@ const HTTP_SERVICE_UNAVAILABLE_STATUS = 503;
 const LEADING_DOT_REGEX = /^\./u;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
 const DEFAULT_STATIC_NODE_DISCOVERY_PORT = 30_303;
+const {
+  staticNodeServiceName: DEFAULT_SERVICE_NAME,
+  staticNodePodPrefix: DEFAULT_POD_PREFIX,
+  genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
+  staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+  faucetArtifactPrefix: DEFAULT_FAUCET_PREFIX,
+} = ARTIFACT_DEFAULTS;
 const SAMPLE_STATIC_DOMAIN = "svc.cluster.local";
 const SAMPLE_STATIC_NAMESPACE = "network";
 const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
 const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
+
+type KubeMockHandles = {
+  createdConfigMaps: string[];
+  createdSecrets: string[];
+  restore: () => void;
+};
+
+const setupKubeMocks = (): KubeMockHandles => {
+  const createdConfigMaps: string[] = [];
+  const createdSecrets: string[] = [];
+  const kubePrototype = KubeConfig.prototype as unknown as {
+    loadFromCluster: () => void;
+    makeApiClient: () => CoreV1Api;
+  };
+  const originalLoad = kubePrototype.loadFromCluster;
+  const originalMake = kubePrototype.makeApiClient;
+  const originalFile = Bun.file;
+
+  kubePrototype.loadFromCluster = function loadFromCluster(): void {
+    /* no-op for tests */
+  };
+
+  kubePrototype.makeApiClient = function makeApiClient(): CoreV1Api {
+    return {
+      listNamespacedConfigMap: () => Promise.resolve(),
+      listNamespacedSecret: () => Promise.resolve(),
+      createNamespacedConfigMap: ({
+        body,
+      }: {
+        body: { metadata?: { name?: string } };
+      }) => {
+        createdConfigMaps.push(body?.metadata?.name ?? "");
+        return Promise.resolve();
+      },
+      createNamespacedSecret: ({
+        body,
+      }: {
+        body: { metadata?: { name?: string } };
+      }) => {
+        createdSecrets.push(body?.metadata?.name ?? "");
+        return Promise.resolve();
+      },
+    } as unknown as CoreV1Api;
+  };
+
+  (Bun as any).file = () =>
+    ({
+      text: () => Promise.resolve("custom-namespace"),
+    }) as ReturnType<typeof Bun.file>;
+
+  return {
+    createdConfigMaps,
+    createdSecrets,
+    restore: () => {
+      kubePrototype.loadFromCluster = originalLoad;
+      kubePrototype.makeApiClient = originalMake;
+      (Bun as any).file = originalFile;
+    },
+  };
+};
+
+const containsAll = (actual: readonly string[], expected: readonly string[]) =>
+  expected.every((name) => actual.includes(name));
 
 const sampleNode = (index: number): IndexedNode => {
   const hexValue = index.toString(HEX_RADIX);
@@ -111,7 +182,9 @@ const staticNodeUri = (
   domain?: string,
   port = DEFAULT_STATIC_NODE_PORT,
   discoveryPort = DEFAULT_STATIC_NODE_DISCOVERY_PORT,
-  namespace?: string
+  namespace?: string,
+  serviceName: string = DEFAULT_SERVICE_NAME,
+  podPrefix: string = DEFAULT_POD_PREFIX
 ): string => {
   const trimmedDomain =
     domain === undefined || domain.trim().length === 0
@@ -122,8 +195,7 @@ const staticNodeUri = (
       ? undefined
       : namespace.trim();
   const ordinal = node.index - 1;
-  const podName = `besu-node-validator-${ordinal}`;
-  const serviceName = "besu-node";
+  const podName = `${podPrefix}-${ordinal}`;
   const segments = [podName, serviceName];
   if (trimmedNamespace) {
     segments.push(trimmedNamespace);
@@ -159,6 +231,12 @@ const samplePayload: OutputPayload = {
       SAMPLE_STATIC_NAMESPACE
     ),
   ],
+  artifactNames: {
+    faucetPrefix: DEFAULT_FAUCET_PREFIX,
+    validatorPrefix: DEFAULT_POD_PREFIX,
+    genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
+    staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+  },
 };
 
 describe("outputResult", () => {
@@ -193,19 +271,19 @@ describe("outputResult", () => {
         "besu-node-validator-0-enode",
         "besu-node-validator-0-private-key",
         "besu-node-validator-0-pubkey",
-        "genesis",
-        "static-nodes.json",
+        "besu-genesis.json",
+        "besu-static-nodes.json",
       ].sort()
     );
 
     const genesisContent = await readFile(
-      join(targetDirPath, "genesis"),
+      join(targetDirPath, "besu-genesis.json"),
       "utf8"
     );
     expect(genesisContent).toContain(`"chainId": ${TEST_CHAIN_ID}`);
 
     const staticNodesContent = await readFile(
-      join(targetDirPath, "static-nodes.json"),
+      join(targetDirPath, "besu-static-nodes.json"),
       "utf8"
     );
     expect(JSON.parse(staticNodesContent)).toEqual(samplePayload.staticNodes);
@@ -317,6 +395,53 @@ describe("outputResult", () => {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
       (KubeConfig.prototype as any).makeApiClient = originalMake;
       (Bun as any).file = originalFile;
+    }
+  });
+
+  test("kubernetes output respects custom artifact names", async () => {
+    const { createdConfigMaps, createdSecrets, restore } = setupKubeMocks();
+
+    try {
+      const payload: OutputPayload = {
+        ...samplePayload,
+        artifactNames: {
+          faucetPrefix: "custom-faucet",
+          validatorPrefix: "custom-validator",
+          genesisConfigMapName: "custom-genesis",
+          staticNodesConfigMapName: "custom-static",
+        },
+        staticNodes: [
+          staticNodeUri(
+            sampleValidator,
+            SAMPLE_STATIC_DOMAIN,
+            DEFAULT_STATIC_NODE_PORT,
+            DEFAULT_STATIC_NODE_DISCOVERY_PORT,
+            SAMPLE_STATIC_NAMESPACE,
+            "custom-service",
+            "custom-validator"
+          ),
+        ],
+      };
+
+      await outputResult("kubernetes", payload);
+
+      const expectedConfigMaps = [
+        "custom-genesis",
+        "custom-static",
+        "custom-validator-0-address",
+        "custom-faucet-address",
+      ];
+      const expectedSecrets = [
+        "custom-faucet-private-key",
+        "custom-validator-0-private-key",
+      ];
+
+      expect(containsAll(createdConfigMaps.sort(), expectedConfigMaps)).toBe(
+        true
+      );
+      expect(containsAll(createdSecrets.sort(), expectedSecrets)).toBe(true);
+    } finally {
+      restore();
     }
   });
 

@@ -172,6 +172,54 @@ const promptForBigIntString = async ({
   }
 };
 
+type TextPromptOptions = {
+  allowEmpty?: boolean;
+  defaultValue: string;
+  labelText: string;
+  message: string;
+  prompt?: InputPrompt;
+};
+
+const promptForText = async ({
+  allowEmpty = false,
+  defaultValue,
+  labelText,
+  message,
+  prompt = inputPrompt,
+}: TextPromptOptions): Promise<string> => {
+  const formattedMessage = accent(
+    `${message} (enter ${ABORT_OPTION} to abort)`
+  );
+
+  for (;;) {
+    const raw = (
+      await prompt({
+        message: formattedMessage,
+        default: defaultValue,
+      })
+    )
+      .toString()
+      .trim();
+
+    if (raw.length === 0) {
+      if (allowEmpty) {
+        return "";
+      }
+      return defaultValue;
+    }
+
+    ensureNotAborted(raw, labelText);
+
+    if (raw.length > 0) {
+      return raw;
+    }
+
+    process.stdout.write(
+      `${labelText} must be a non-empty value or ${ABORT_OPTION} to abort.\n`
+    );
+  }
+};
+
 export type { InputPrompt };
 export {
   ABORT_OPTION,
@@ -180,4 +228,5 @@ export {
   promptForBigIntString,
   promptForCount,
   promptForInteger,
+  promptForText,
 };

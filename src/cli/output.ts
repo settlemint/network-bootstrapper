@@ -10,11 +10,19 @@ type IndexedNode = GeneratedNodeKey & { index: number };
 
 type OutputType = "screen" | "file" | "kubernetes";
 
+type ArtifactNames = {
+  faucetPrefix: string;
+  validatorPrefix: string;
+  genesisConfigMapName: string;
+  staticNodesConfigMapName: string;
+};
+
 type OutputPayload = {
   faucet: GeneratedNodeKey;
   genesis: unknown;
   validators: readonly IndexedNode[];
   staticNodes: readonly string[];
+  artifactNames: ArtifactNames;
 };
 
 type ConfigMapSpec = {
@@ -96,34 +104,33 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
   const directory = join(OUTPUT_DIR, timestamp);
   await mkdir(directory, { recursive: true });
 
-  const validatorSpecs = createValidatorSpecs(payload.validators);
+  const { artifactNames } = payload;
+  const validatorSpecs = createValidatorSpecs(
+    payload.validators,
+    artifactNames.validatorPrefix
+  );
 
+  const faucetConfigSpecs = createFaucetConfigSpecs(
+    payload.faucet,
+    artifactNames.faucetPrefix
+  );
+  const faucetSecretSpecs = createFaucetSecretSpecs(
+    payload.faucet,
+    artifactNames.faucetPrefix
+  );
   const faucetSpecs: ConfigMapSpec[] = [
+    ...faucetConfigSpecs,
+    ...faucetSecretSpecs,
     {
-      name: "besu-faucet-address",
-      key: "address",
-      value: payload.faucet.address,
-    },
-    {
-      name: "besu-faucet-private-key",
-      key: "privateKey",
-      value: payload.faucet.privateKey,
-    },
-    {
-      name: "besu-faucet-enode",
+      name: `${artifactNames.faucetPrefix}-enode`,
       key: "enode",
       value: payload.faucet.enode,
-    },
-    {
-      name: "besu-faucet-pubkey",
-      key: "publicKey",
-      value: payload.faucet.publicKey,
     },
   ];
 
   const writes: Promise<number>[] = [
     Bun.write(
-      join(directory, "genesis"),
+      join(directory, `${artifactNames.genesisConfigMapName}.json`),
       `${JSON.stringify(payload.genesis, null, 2)}\n`
     ),
     ...[...validatorSpecs, ...faucetSpecs].map((spec) =>
@@ -133,7 +140,7 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
       )
     ),
     Bun.write(
-      join(directory, "static-nodes.json"),
+      join(directory, `${artifactNames.staticNodesConfigMapName}.json`),
       `${JSON.stringify(payload.staticNodes, null, 2)}\n`
     ),
   ];
@@ -144,25 +151,29 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
 
 const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
   const { client, namespace } = await createKubernetesClient();
-  const validatorSpecs = createValidatorSpecs(payload.validators);
+  const { artifactNames } = payload;
+  const validatorSpecs = createValidatorSpecs(
+    payload.validators,
+    artifactNames.validatorPrefix
+  );
   const allSpecs = [...validatorSpecs];
   const configMapSpecs = [
     ...allSpecs.filter((spec) => spec.key !== "privateKey"),
-    ...createFaucetConfigSpecs(payload.faucet),
+    ...createFaucetConfigSpecs(payload.faucet, artifactNames.faucetPrefix),
     {
-      name: "besu-genesis",
+      name: artifactNames.genesisConfigMapName,
       key: "genesis.json",
       value: JSON.stringify(payload.genesis, null, 2),
     },
     {
-      name: "besu-static-nodes",
+      name: artifactNames.staticNodesConfigMapName,
       key: "static-nodes.json",
       value: JSON.stringify(payload.staticNodes, null, 2),
     },
   ];
   const secretSpecs = [
     ...allSpecs.filter((spec) => spec.key === "privateKey"),
-    ...createFaucetSecretSpecs(payload.faucet),
+    ...createFaucetSecretSpecs(payload.faucet, artifactNames.faucetPrefix),
   ];
 
   await Promise.all([
@@ -175,11 +186,14 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
   );
 };
 
-const createValidatorSpecs = (nodes: readonly IndexedNode[]): ConfigMapSpec[] =>
+const createValidatorSpecs = (
+  nodes: readonly IndexedNode[],
+  validatorPrefix: string
+): ConfigMapSpec[] =>
   nodes.flatMap<ConfigMapSpec>((node) => {
     // Align artifact names with 0-indexed StatefulSet pod ordinals.
     const ordinal = node.index - 1;
-    const base = `besu-node-validator-${ordinal}`;
+    const base = `${validatorPrefix}-${ordinal}`;
     return [
       { name: `${base}-address`, key: "address", value: node.address },
       {
@@ -192,14 +206,20 @@ const createValidatorSpecs = (nodes: readonly IndexedNode[]): ConfigMapSpec[] =>
     ];
   });
 
-const createFaucetConfigSpecs = (faucet: GeneratedNodeKey): ConfigMapSpec[] => [
-  { name: "besu-faucet-address", key: "address", value: faucet.address },
-  { name: "besu-faucet-pubkey", key: "publicKey", value: faucet.publicKey },
+const createFaucetConfigSpecs = (
+  faucet: GeneratedNodeKey,
+  prefix: string
+): ConfigMapSpec[] => [
+  { name: `${prefix}-address`, key: "address", value: faucet.address },
+  { name: `${prefix}-pubkey`, key: "publicKey", value: faucet.publicKey },
 ];
 
-const createFaucetSecretSpecs = (faucet: GeneratedNodeKey): SecretSpec[] => [
+const createFaucetSecretSpecs = (
+  faucet: GeneratedNodeKey,
+  prefix: string
+): SecretSpec[] => [
   {
-    name: "besu-faucet-private-key",
+    name: `${prefix}-private-key`,
     key: "privateKey",
     value: faucet.privateKey,
   },
@@ -373,5 +393,5 @@ const outputResult = async (
   throw new Error(`Unsupported output type: ${exhaustiveCheck}`);
 };
 
-export type { IndexedNode, OutputPayload, OutputType };
+export type { ArtifactNames, IndexedNode, OutputPayload, OutputType };
 export { outputResult, printFaucet, printGenesis, printGroup };

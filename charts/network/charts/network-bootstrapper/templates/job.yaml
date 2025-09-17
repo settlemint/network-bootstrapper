@@ -51,6 +51,20 @@ spec:
             {{- $resolvedStaticDomain := default $clusterDomain .Values.settings.staticNodeDomain }}
             {{- $resolvedStaticPort := default $defaultStaticPort .Values.settings.staticNodePort }}
             {{- $resolvedStaticDiscovery := default $defaultStaticDiscovery .Values.settings.staticNodeDiscoveryPort }}
+            {{- $globalNodes := default (dict) .Values.global.networkNodes }}
+            {{- $autoNames := dict "service" "besu-node" "podPrefix" "besu-node-validator" }}
+            {{- with (index $.Subcharts "network-nodes") }}
+              {{- $service := include "nodes.fullname" . }}
+              {{- $_ := set $autoNames "service" $service }}
+              {{- $_ := set $autoNames "podPrefix" (printf "%s-validator" $service) }}
+            {{- end }}
+            {{- $serviceOverride := coalesce .Values.settings.staticNodeServiceName (get $globalNodes "serviceName") }}
+            {{- $resolvedServiceName := default (index $autoNames "service") $serviceOverride }}
+            {{- $podOverride := coalesce .Values.settings.staticNodePodPrefix (get $globalNodes "podPrefix") }}
+            {{- $resolvedPodPrefix := default (index $autoNames "podPrefix") $podOverride }}
+            {{- $resolvedGenesisName := default "besu-genesis" (default (get $globalNodes "genesisConfigMapName") .Values.settings.genesisConfigMapName) }}
+            {{- $resolvedStaticNodesName := default "besu-static-nodes" (default (get $globalNodes "staticNodesConfigMapName") .Values.settings.staticNodesConfigMapName) }}
+            {{- $resolvedFaucetPrefix := default "besu-faucet" (default (get $globalNodes "faucetArtifactPrefix") .Values.settings.faucetArtifactPrefix) }}
             {{- with .Values.settings.validators }}
             - --validators={{ . }}
             {{- end }}
@@ -60,6 +74,11 @@ spec:
             {{- end }}
             - --static-node-port={{ $resolvedStaticPort }}
             - --static-node-discovery-port={{ $resolvedStaticDiscovery }}
+            - --static-node-service-name={{ $resolvedServiceName }}
+            - --static-node-pod-prefix={{ $resolvedPodPrefix }}
+            - --genesis-configmap-name={{ $resolvedGenesisName }}
+            - --static-nodes-configmap-name={{ $resolvedStaticNodesName }}
+            - --faucet-artifact-prefix={{ $resolvedFaucetPrefix }}
             {{- with .Values.settings.allocations }}
             - --allocations={{ . }}
             {{- end }}

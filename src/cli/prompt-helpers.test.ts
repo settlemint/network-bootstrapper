@@ -6,6 +6,7 @@ import {
   promptForBigIntString,
   promptForCount,
   promptForInteger,
+  promptForText,
 } from "./prompt-helpers.ts";
 
 const PROVIDED_RESULT = 7;
@@ -16,6 +17,7 @@ const VALID_COUNT_INPUT = "3";
 const VALID_COUNT_EXPECTED = 3;
 const INTEGER_DEFAULT = 4;
 const MINIMUM_INTEGER = 1;
+const TEXT_DEFAULT = "default-value";
 
 const stubInput = (responses: string[]) => {
   let index = 0;
@@ -117,6 +119,48 @@ describe("prompt helpers", () => {
         labelText: "Abort",
         message: "Abort",
         min: MINIMUM_INTEGER,
+        prompt: stubInput([ABORT_OPTION]),
+      })
+    ).rejects.toThrow(`Abort aborted via ${ABORT_OPTION}.`);
+  });
+
+  test("promptForText returns trimmed input", async () => {
+    const result = await promptForText({
+      defaultValue: TEXT_DEFAULT,
+      labelText: "Service name",
+      message: "Service name",
+      prompt: stubInput(["  custom-service  "]),
+    });
+    expect(result).toBe("custom-service");
+  });
+
+  test("promptForText falls back to default when blank", async () => {
+    const result = await promptForText({
+      defaultValue: TEXT_DEFAULT,
+      labelText: "Service name",
+      message: "Service name",
+      prompt: stubInput([""]),
+    });
+    expect(result).toBe(TEXT_DEFAULT);
+  });
+
+  test("promptForText permits empty string when allowed", async () => {
+    const result = await promptForText({
+      allowEmpty: true,
+      defaultValue: TEXT_DEFAULT,
+      labelText: "Optional",
+      message: "Optional",
+      prompt: stubInput([" "]),
+    });
+    expect(result).toBe("");
+  });
+
+  test("promptForText aborts when sentinel provided", async () => {
+    await expect(
+      promptForText({
+        defaultValue: TEXT_DEFAULT,
+        labelText: "Abort",
+        message: "Abort",
         prompt: stubInput([ABORT_OPTION]),
       })
     ).rejects.toThrow(`Abort aborted via ${ABORT_OPTION}.`);
