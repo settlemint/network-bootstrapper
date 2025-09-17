@@ -60,6 +60,7 @@ jobs:
           SLACK_CHANNEL_ID: op://platform/slack-bot/SLACK_CHANNEL_ID
           HARBOR_USER: op://platform/harbor/username
           HARBOR_PASS: op://platform/harbor/password
+          PAT_TOKEN: op://platform/github-commit-pat/credential
 
       # Label QA as running and notify Slack (only for non-draft PRs)
       - name: Label QA as running
@@ -126,6 +127,18 @@ jobs:
       - name: Run docs
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         run: bun run docs:helm
+
+      # Commit generated version metadata and README updates on release tags
+      - name: Auto-commit release assets
+        if: github.event_name == 'push' && steps.version.outputs.tag == 'latest'
+        uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 # v5
+        with:
+          commit_message: "chore(release): sync generated assets [skip ci]"
+          branch: main
+          file_pattern: 'package.json **/package.json charts/**/Chart.yaml charts/**/README.md README.md'
+          github_token: ${{ env.PAT_TOKEN }}
+          commit_author_name: 'SettleMint Release Bot'
+          commit_author_email: 'support@settlemint.com'
 
       - name: Docker meta
         if: github.event_name == 'pull_request' || github.event_name == 'push'
