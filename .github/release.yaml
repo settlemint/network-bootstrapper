@@ -1,0 +1,41 @@
+changelog:
+  categories:
+    - title: Breaking Changes 🛠
+      labels:
+        - breaking
+    - title: Exciting New Features 🎉
+      labels:
+        - feat
+    - title: Important Bug Fixes 🐛
+      labels:
+        - fix
+    - title: Performance Improvements ⚡
+      labels:
+        - perf
+    - title: Code Refactoring 🔧
+      labels:
+        - refactor
+    - title: Documentation 📚
+      labels:
+        - docs
+    - title: Code Style 💅
+      labels:
+        - style
+    - title: Tests 🧪
+      labels:
+        - test
+    - title: Build System 🏗️
+      labels:
+        - build
+    - title: CI/CD 🚀
+      labels:
+        - ci
+    - title: Reverts ↩️
+      labels:
+        - revert
+    - title: Dependencies 📦
+      labels:
+        - dependencies
+    - title: Other Changes 🔨
+      labels:
+        - chore

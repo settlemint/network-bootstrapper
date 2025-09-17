@@ -1,0 +1,134 @@
+import { describe, expect, test } from "bun:test";
+
+import {
+  ABORT_OPTION,
+  createCountParser,
+  promptForBigIntString,
+  promptForCount,
+  promptForInteger,
+  __testing as promptHelpersTesting,
+} from "./prompt-helpers.ts";
+
+const PROVIDED_RESULT = 7;
+const DEFAULT_PROMPT = 2;
+const PROMPT_VALUE = "5";
+const INVALID_VALUE = "not-a-number";
+const VALID_COUNT_INPUT = "3";
+const VALID_COUNT_EXPECTED = 3;
+
+const stubInput = (responses: string[]) => {
+  let index = 0;
+  return ((config: unknown) => {
+    const value = responses[index++];
+    if (value === undefined) {
+      throw new Error("No more stub responses available");
+    }
+    const response = Promise.resolve(value) as Promise<string> & {
+      cancel: () => void;
+    };
+    response.cancel = () => {
+      if (typeof config === "object" && config && "cancel" in (config as any)) {
+        // no-op but ensures shape compatibility with prompt interface
+      }
+    };
+    return response;
+  }) as typeof import("@inquirer/prompts").input;
+};
+
+describe("prompt helpers", () => {
+  test("createCountParser validates input", () => {
+    const parser = createCountParser("Validators");
+    expect(parser(VALID_COUNT_INPUT)).toBe(VALID_COUNT_EXPECTED);
+    expect(() => parser("-1")).toThrow(
+      "Validators must be a non-negative integer."
+    );
+  });
+
+  test("promptForCount honours provided value", async () => {
+    const result = await promptForCount(
+      "validators",
+      PROVIDED_RESULT,
+      DEFAULT_PROMPT,
+      stubInput([])
+    );
+    expect(result).toBe(PROVIDED_RESULT);
+  });
+
+  test("promptForCount returns default when response is blank", async () => {
+    const result = await promptForCount(
+      "validators",
+      undefined,
+      DEFAULT_PROMPT,
+      stubInput([""])
+    );
+    expect(result).toBe(DEFAULT_PROMPT);
+  });
+
+  test("promptForCount retries until valid input", async () => {
+    const responses = [INVALID_VALUE, PROMPT_VALUE];
+    const result = await promptForCount(
+      "validators",
+      undefined,
+      DEFAULT_PROMPT,
+      stubInput(responses)
+    );
+    expect(result).toBe(Number.parseInt(PROMPT_VALUE, 10));
+  });
+
+  test("promptForCount aborts on sentinel", async () => {
+    await expect(
+      promptForCount(
+        "validators",
+        undefined,
+        DEFAULT_PROMPT,
+        stubInput([ABORT_OPTION])
+      )
+    ).rejects.toThrow("Provide CLI flags to skip interactivity.");
+  });
+
+  test("promptForInteger falls back to default after invalid input", async () => {
+    const responses = ["not-a-number", "0", "", "7"];
+    const result = await promptForInteger({
+      defaultValue: 4,
+      labelText: "Example",
+      message: "Example",
+      min: 1,
+      prompt: stubInput(responses),
+    });
+    expect(result).toBe(4);
+  });
+
+  test("promptForBigIntString enforces positive integers", async () => {
+    const responses = ["bad", "0", "123"];
+    const result = await promptForBigIntString({
+      defaultValue: "500",
+      labelText: "Big",
+      message: "Big",
+      prompt: stubInput(responses),
+    });
+    expect(result).toBe("123");
+  });
+
+  test("promptForInteger aborts when sentinel provided", async () => {
+    await expect(
+      promptForInteger({
+        defaultValue: 1,
+        labelText: "Abort",
+        message: "Abort",
+        min: 1,
+        prompt: stubInput([ABORT_OPTION]),
+      })
+    ).rejects.toThrow(`Abort aborted via ${ABORT_OPTION}.`);
+  });
+
+  test("internal helpers validate values", () => {
+    expect(promptHelpersTesting.toCount("5")).toBe(5);
+    expect(promptHelpersTesting.toCount("-1")).toBeUndefined();
+    expect(() =>
+      promptHelpersTesting.ensureNotAborted(ABORT_OPTION, "Test")
+    ).toThrow(`Test aborted via ${ABORT_OPTION}.`);
+    expect(promptHelpersTesting.ensureNotAborted("value", "Test")).toBe(
+      "value"
+    );
+  });
+});

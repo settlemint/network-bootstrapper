@@ -1,0 +1,368 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
+import { getAddress } from "viem";
+import type { BesuAllocAccount } from "../genesis/besu-genesis.service.ts";
+import { ALGORITHM } from "../genesis/besu-genesis.service.ts";
+import type { GeneratedNodeKey } from "../keys/node-key-factory.ts";
+import type { BootstrapDependencies, CliOptions } from "./build-command.ts";
+import {
+  __testing as buildCommandTesting,
+  createCliCommand,
+  runBootstrap,
+} from "./build-command.ts";
+import type { OutputPayload, OutputType } from "./output.ts";
+import { outputResult as realOutputResult } from "./output.ts";
+
+const VALIDATOR_LABEL = "validator nodes";
+const RPC_LABEL = "RPC nodes";
+const VALIDATOR_RETURN = 2;
+const RPC_RETURN = 1;
+const GENESIS_MARKER = '"extraData": "0xextra"';
+const EXPECTED_DEFAULT_VALIDATOR = 4;
+const EXPECTED_DEFAULT_RPC = 2;
+const HEX_RADIX = 16;
+const PAD_WIDTH = 2;
+const PAD_CHAR = "0";
+const ADDRESS_REPEAT = 20;
+const PRIVATE_KEY_REPEAT = 32;
+const PUBLIC_KEY_REPEAT = 64;
+const FIRST_VALIDATOR_INDEX = 1;
+const SECOND_VALIDATOR_INDEX = 2;
+const FAUCET_INDEX = 4;
+const CLI_FAUCET_INDEX = 3;
+const createFactoryStub = () => {
+  let counter = 0;
+  return {
+    generate: (): GeneratedNodeKey => {
+      counter += 1;
+      const pattern = counter.toString(HEX_RADIX).padStart(PAD_WIDTH, PAD_CHAR);
+      const addressHex = getAddress(`0x${pattern.repeat(ADDRESS_REPEAT)}`);
+      const privateKey = `0x${pattern.repeat(PRIVATE_KEY_REPEAT)}` as const;
+      const publicKey = `0x04${pattern.repeat(PUBLIC_KEY_REPEAT)}` as const;
+      return {
+        address: addressHex,
+        publicKey,
+        privateKey,
+        enode: privateKey,
+      };
+    },
+  };
+};
+
+const expectedAddress = (index: number) => {
+  const pattern = index.toString(HEX_RADIX).padStart(PAD_WIDTH, PAD_CHAR);
+  return getAddress(`0x${pattern.repeat(ADDRESS_REPEAT)}`);
+};
+
+const captureStdout = () => {
+  let captured = "";
+  const original = process.stdout.write;
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    captured += chunk.toString();
+    return true;
+  }) as typeof process.stdout.write;
+
+  return {
+    read: () => captured,
+    restore: () => {
+      process.stdout.write = original;
+    },
+  };
+};
+
+describe("CLI command bootstrap", () => {
+  let stdout: ReturnType<typeof captureStdout>;
+
+  beforeEach(() => {
+    stdout = captureStdout();
+  });
+
+  afterEach(() => {
+    stdout.restore();
+  });
+
+  test("runBootstrap orchestrates prompts and writes genesis", async () => {
+    const factory = createFactoryStub();
+    const promptCalls: [string, number | undefined, number][] = [];
+    let loadAllocationsPath: string | undefined;
+    let outputInvocation:
+      | {
+          type: OutputType;
+          payload: OutputPayload;
+        }
+      | undefined;
+
+    const deps: BootstrapDependencies = {
+      factory,
+      promptForCount: (label, provided, defaultValue) => {
+        promptCalls.push([label, provided, defaultValue]);
+        const value = label.startsWith("validator")
+          ? VALIDATOR_RETURN
+          : RPC_RETURN;
+        return Promise.resolve(value);
+      },
+      promptForGenesis: (
+        _service,
+        { allocations, validatorAddresses, faucetAddress, preset }
+      ) => {
+        expect(validatorAddresses).toEqual([
+          expectedAddress(FIRST_VALIDATOR_INDEX),
+          expectedAddress(SECOND_VALIDATOR_INDEX),
+        ]);
+        expect(faucetAddress).toBe(expectedAddress(FAUCET_INDEX));
+        expect(allocations).toEqual({
+          [expectedAddress(FAUCET_INDEX)]: { balance: "0x01" },
+        });
+        expect(preset).toEqual({
+          algorithm: undefined,
+          chainId: undefined,
+          secondsPerBlock: undefined,
+          gasLimit: undefined,
+          gasPrice: undefined,
+          evmStackSize: undefined,
+          contractSizeLimit: undefined,
+        });
+        return Promise.resolve({
+          algorithm: ALGORITHM.QBFT,
+          config: {
+            chainId: 99,
+            faucetWalletAddress: faucetAddress,
+            gasLimit: "0x2",
+            secondsPerBlock: 4,
+          },
+          genesis: { config: {}, extraData: "0xextra" } as any,
+        });
+      },
+      service: {} as any,
+      loadAllocations: (path: string) => {
+        loadAllocationsPath = path;
+        return Promise.resolve({
+          [expectedAddress(FAUCET_INDEX)]: { balance: "0x01" as const },
+        } satisfies Record<string, BesuAllocAccount>);
+      },
+      outputResult: async (type, payload) => {
+        outputInvocation = { type, payload };
+        await realOutputResult(type, payload);
+      },
+    };
+
+    const options: CliOptions = { allocations: "/tmp/alloc.json" };
+
+    await runBootstrap(options, deps);
+
+    expect(promptCalls).toEqual([
+      [VALIDATOR_LABEL, undefined, EXPECTED_DEFAULT_VALIDATOR],
+      [RPC_LABEL, undefined, EXPECTED_DEFAULT_RPC],
+    ]);
+    const output = stdout.read();
+    expect(output).toContain("Genesis");
+    expect(output).toContain("Validator Nodes");
+    expect(output).toContain("RPC Nodes");
+    expect(output).toContain(GENESIS_MARKER);
+    expect(loadAllocationsPath).toBe("/tmp/alloc.json");
+    expect(outputInvocation?.type).toBe("screen");
+  });
+
+  test("createCliCommand wires metadata", () => {
+    const command = createCliCommand();
+    expect(command.name()).toBe("network-bootstrapper");
+  });
+
+  test("createCliCommand action runs with provided options", async () => {
+    const factory = createFactoryStub();
+    const promptCalls: [string, number | undefined, number][] = [];
+    const deps: BootstrapDependencies = {
+      factory,
+      promptForCount: (label, provided, defaultValue) => {
+        promptCalls.push([label, provided, defaultValue]);
+        return Promise.resolve(provided ?? VALIDATOR_RETURN);
+      },
+      promptForGenesis: (_service, { preset }) => {
+        expect(preset).toEqual({
+          algorithm: ALGORITHM.QBFT,
+          chainId: 55,
+          secondsPerBlock: 3,
+          gasLimit: "5000000",
+          gasPrice: 1,
+          evmStackSize: 2048,
+          contractSizeLimit: 10_000,
+        });
+        return Promise.resolve({
+          algorithm: preset?.algorithm ?? ALGORITHM.QBFT,
+          config: {
+            chainId: preset?.chainId ?? 1,
+            faucetWalletAddress: expectedAddress(CLI_FAUCET_INDEX),
+            gasLimit: "0x1",
+            secondsPerBlock: preset?.secondsPerBlock ?? 1,
+            gasPrice: preset?.gasPrice ?? 0,
+          },
+          genesis: { config: {}, extraData: "0xextra" } as any,
+        });
+      },
+      service: {} as any,
+      loadAllocations: () =>
+        Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      outputResult: async (type, payload) => {
+        await realOutputResult(type, payload);
+      },
+    };
+
+    const command = createCliCommand(deps);
+    await command.parseAsync(
+      [
+        "node",
+        "cli",
+        "--validators",
+        "2",
+        "--rpc-nodes",
+        "1",
+        "--allocations",
+        "/tmp/mock.json",
+        "--consensus",
+        "qbft",
+        "--chain-id",
+        "55",
+        "--seconds-per-block",
+        "3",
+        "--gas-limit",
+        "5000000",
+        "--gas-price",
+        "1",
+        "--evm-stack-size",
+        "2048",
+        "--contract-size-limit",
+        "10000",
+      ],
+      { from: "node" }
+    );
+
+    expect(promptCalls).toEqual([
+      [VALIDATOR_LABEL, 2, EXPECTED_DEFAULT_VALIDATOR],
+      [RPC_LABEL, 1, EXPECTED_DEFAULT_RPC],
+    ]);
+    expect(stdout.read()).toContain("Genesis");
+    expect(stdout.read()).toContain(GENESIS_MARKER);
+  });
+
+  test("runBootstrap bypasses genesis prompts when CLI overrides provided", async () => {
+    const factory = createFactoryStub();
+    const deps: BootstrapDependencies = {
+      factory,
+      promptForCount: (_label, provided) => {
+        if (provided === undefined) {
+          throw new Error(
+            "promptForCount should not prompt when values are provided"
+          );
+        }
+        return Promise.resolve(provided);
+      },
+      promptForGenesis: (_service, { preset }) => {
+        expect(preset).toEqual({
+          algorithm: ALGORITHM.IBFTv2,
+          chainId: 1234,
+          secondsPerBlock: 6,
+          gasLimit: "1000000",
+          gasPrice: 0,
+          evmStackSize: 4096,
+          contractSizeLimit: 100_000,
+        });
+        return Promise.resolve({
+          algorithm: ALGORITHM.IBFTv2,
+          config: {
+            chainId: 1234,
+            faucetWalletAddress: expectedAddress(CLI_FAUCET_INDEX),
+            gasLimit: "0x1",
+            secondsPerBlock: 6,
+          },
+          genesis: { config: {}, extraData: "0xextra" } as any,
+        });
+      },
+      service: {} as any,
+      loadAllocations: () =>
+        Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      outputResult: async () => {
+        // no-op for test
+      },
+    };
+
+    const options: CliOptions = {
+      validators: 1,
+      rpcNodes: 1,
+      consensus: ALGORITHM.IBFTv2,
+      chainId: 1234,
+      secondsPerBlock: 6,
+      gasLimit: "1000000",
+      gasPrice: 0,
+      evmStackSize: 4096,
+      contractSizeLimit: 100_000,
+    };
+
+    await runBootstrap(options, deps);
+  });
+
+  test("createCliCommand rejects invalid numeric arguments", async () => {
+    const shouldReject = async (args: string[], message: string) => {
+      const command = createCliCommand();
+      command.exitOverride();
+      await expect(
+        command.parseAsync(["node", "cli", ...args])
+      ).rejects.toThrow(message);
+    };
+
+    await shouldReject(
+      ["--chain-id", "0"],
+      "Chain ID must be a positive integer."
+    );
+    await shouldReject(
+      ["--gas-price", "-1"],
+      "Gas price must be a non-negative integer."
+    );
+    await shouldReject(
+      ["--gas-limit", "0"],
+      "Gas limit must be a positive integer."
+    );
+    await shouldReject(
+      ["--gas-limit", "not-a-number"],
+      "Gas limit must be a positive integer."
+    );
+  });
+
+  test("createCliCommand rejects unsupported output type", async () => {
+    const command = createCliCommand();
+    command.exitOverride();
+    await expect(
+      command.parseAsync(["node", "cli", "--outputType", "invalid"])
+    ).rejects.toThrow(
+      `Output type must be one of: ${["screen", "file", "kubernetes"].join(", ")}.`
+    );
+  });
+
+  test("createCliCommand rejects unsupported consensus", async () => {
+    const command = createCliCommand();
+    command.exitOverride();
+    await expect(
+      command.parseAsync(["node", "cli", "--consensus", "invalid"])
+    ).rejects.toThrow(
+      `Consensus must be one of: ${Object.values(ALGORITHM).join(", ")}.`
+    );
+  });
+
+  test("parse helpers validate inputs", () => {
+    expect(buildCommandTesting.parsePositiveInteger("5", "Label")).toBe(5);
+    expect(buildCommandTesting.parseNonNegativeInteger("0", "Zero")).toBe(0);
+    expect(buildCommandTesting.parsePositiveBigInt("123", "Big")).toBe("123");
+
+    expect(() =>
+      buildCommandTesting.parsePositiveInteger("0", "Label")
+    ).toThrow("Label must be a positive integer.");
+    expect(() =>
+      buildCommandTesting.parseNonNegativeInteger("-1", "Zero")
+    ).toThrow("Zero must be a non-negative integer.");
+    expect(() => buildCommandTesting.parsePositiveBigInt("-5", "Big")).toThrow(
+      "Big must be a positive integer."
+    );
+    expect(() => buildCommandTesting.parsePositiveBigInt("not", "Big")).toThrow(
+      "Big must be a positive integer."
+    );
+  });
+});

@@ -1,0 +1,150 @@
+{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[graphql]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "emmet.showExpandedAbbreviation": "never",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "editor.fontLigatures": true,
+  "editor.lineHeight": 0,
+  "editor.stickyScroll.enabled": true,
+  "editor.tabSize": 2,
+  "errorLens.fontStyleItalic": true,
+  "eslint.codeActionsOnSave.mode": "all",
+  "eslint.enable": true,
+  "eslint.lintTask.enable": true,
+  "eslint.run": "onType",
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+  "explorer.confirmPasteNative": false,
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.contract.ts": "${capture}.contract.ts, ${capture}.router.ts",
+    "*.cts": "${capture}.typegen.ts",
+    "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts",
+    "*.jsx": "${capture}.js",
+    "*.mts": "${capture}.typegen.ts",
+    "*.ts": "${capture}.js, ${capture}.typegen.ts, ${capture}.spec.ts, ${capture}.test.ts, ${capture}.test.tsx, ${capture}.schema.ts, ${capture}.contract.ts",
+    "*.tsx": "${capture}.ts, ${capture}.typegen.ts, ${capture}.spec.ts, ${capture}.test.ts, ${capture}.spec.tsx, ${capture}.test.tsx, ${capture}.schema.tsx",
+    "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb, bun.lock",
+    "tsconfig.json": "tsconfig.*.json",
+    "index.tsx": "index.tsx, _layout.tsx, ${capture}.lazy.tsx, ${capture}.component.tsx, ${capture}.loader.ts, ${capture}.action.ts",
+    "index.ts": "index.ts, _layout.ts, ${capture}.lazy.ts, ${capture}.component.ts, ${capture}.loader.ts, ${capture}.action.ts",
+    "route.tsx": "route.tsx, _layout.tsx, ${capture}.lazy.tsx, ${capture}.component.tsx, ${capture}.loader.ts, ${capture}.action.ts",
+    "route.ts": "route.ts, _layout.ts, ${capture}.lazy.ts, ${capture}.component.ts, ${capture}.loader.ts, ${capture}.action.ts",
+    "$.tsx": "$.tsx, _layout.tsx, ${capture}.lazy.tsx, ${capture}.component.tsx, ${capture}.loader.ts, ${capture}.action.ts",
+    "$.ts": "$.ts, _layout.ts, ${capture}.lazy.ts, ${capture}.component.ts, ${capture}.loader.ts, ${capture}.action.ts",
+    "$*.tsx": "_layout.tsx, ${capture}.lazy.tsx, ${capture}.component.tsx, ${capture}.loader.ts, ${capture}.action.ts",
+    "$*.ts": "_layout.ts, ${capture}.lazy.ts, ${capture}.component.ts, ${capture}.loader.ts, ${capture}.action.ts",
+    "(*.tsx": "_layout.tsx, ${capture}.lazy.tsx, ${capture}.component.tsx, ${capture}.loader.ts, ${capture}.action.ts",
+    "(*.ts": "_layout.ts, ${capture}.lazy.ts, ${capture}.component.ts, ${capture}.loader.ts, ${capture}.action.ts",
+    "app.tsx": "app.tsx, client.tsx, server.tsx, ssr.tsx",
+    "router.tsx": "router.tsx, router.config.ts, router.types.ts",
+    "api.tsx": "api.tsx, ${capture}.handler.ts, ${capture}.middleware.ts, ${capture}.schema.ts",
+    "__root.tsx": "__root.tsx, _layout.tsx, ${capture}.component.tsx, ${capture}.loader.ts"
+  },
+  "extensions.ignoreRecommendations": true,
+  "files.associations": {
+    "*.css": "tailwindcss",
+    ".env*": "dotenv"
+  },
+  "files.readonlyInclude": {
+    "**/routeTree.gen.ts": true
+  },
+  "files.watcherExclude": {
+    "**/routeTree.gen.ts": true
+  },
+  "git.autoStash": true,
+  "git.autofetch": true,
+  "git.enableCommitSigning": true,
+  "git.enableSmartCommit": true,
+  "git.replaceTagsWhenPull": true,
+  "githubPullRequests.commentExpandState": "collapseAll",
+  "githubPullRequests.defaultMergeMethod": "squash",
+  "githubPullRequests.notifications": "pullRequests",
+  "githubPullRequests.quickDiff": true,
+  "i18n-ally.defaultNamespace": "general",
+  "i18n-ally.dirStructure": "dir",
+  "i18n-ally.displayLanguage": "en",
+  "i18n-ally.editor.preferEditor": true,
+  "i18n-ally.enabledFrameworks": ["react-i18next"],
+  "i18n-ally.enabledParsers": ["json"],
+  "i18n-ally.extract.autoDetect": true,
+  "i18n-ally.extract.targetPickingStrategy": "most-similar",
+  "i18n-ally.keystyle": "flat",
+  "i18n-ally.localesPaths": ["kit/dapp/locales"],
+  "i18n-ally.namespace": true,
+  "i18n-ally.pathMatcher": "{locale}/{namespaces}.json",
+  "i18n-ally.sortKeys": true,
+  "i18n-ally.sourceLanguage": "en",
+  "scm.diffDecorationsGutterPattern": {
+    "added": true
+  },
+  "search.exclude": {
+    "**/routeTree.gen.ts": true
+  },
+  "solidity.formatter": "forge",
+  "trailing-spaces.trimOnSave": true,
+  "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
+  "typescript.inlayHints.parameterNames.enabled": "literals",
+  "typescript.inlayHints.parameterTypes.enabled": true,
+  "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
+  "typescript.inlayHints.variableTypes.enabled": true,
+  "typescript.preferences.autoImportSpecifierExcludeRegexes": [
+    "@radix-ui",
+    "next/router",
+    "@atk/zod/src",
+    "@atk/config/src"
+  ],
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "typescript.preferences.useAliasesForRenames": false,
+  "typescript.suggest.completeFunctionCalls": true,
+  "typescript.surveys.enabled": false,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
+  "typescript.tsserver.web.typeAcquisition.enabled": false,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.updateImportsOnPaste.enabled": true,
+  "window.commandCenter": true,
+  "window.confirmSaveUntitledWorkspace": false,
+  "workbench.editor.highlightModifiedTabs": true,
+  "workbench.editor.limit.enabled": true,
+  "workbench.editor.limit.excludeDirty": true,
+  "workbench.editor.revealIfOpen": true,
+  "workbench.fontAliasing": "auto",
+  "workbench.tips.enabled": false,
+  "workbench.tree.enableStickyScroll": true
+}
