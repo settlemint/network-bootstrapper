@@ -39,37 +39,37 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             {{- with .Values.settings.validators }}
-            - --validators={{ . | quote }}
+            - --validators={{ . }}
             {{- end }}
             {{- with .Values.settings.rpcNodes }}
-            - --rpc-nodes={{ . | quote }}
+            - --rpc-nodes={{ . }}
             {{- end }}
             {{- with .Values.settings.allocations }}
-            - --allocations={{ . | quote }}
+            - --allocations={{ . }}
             {{- end }}
             {{- with .Values.settings.outputType }}
-            - --outputType={{ . | quote }}
+            - --outputType={{ . }}
             {{- end }}
             {{- with .Values.settings.consensus }}
-            - --consensus={{ . | quote }}
+            - --consensus={{ . }}
             {{- end }}
             {{- with .Values.settings.chainId }}
-            - --chain-id={{ . | quote }}
+            - --chain-id={{ . }}
             {{- end }}
             {{- with .Values.settings.secondsPerBlock }}
-            - --seconds-per-block={{ . | quote }}
+            - --seconds-per-block={{ . }}
             {{- end }}
             {{- with .Values.settings.gasLimit }}
-            - --gas-limit={{ . | quote }}
+            - --gas-limit={{ . }}
             {{- end }}
             {{- with .Values.settings.gasPrice }}
-            - --gas-price={{ . | quote }}
+            - --gas-price={{ . }}
             {{- end }}
             {{- with .Values.settings.evmStackSize }}
-            - --evm-stack-size={{ . | quote }}
+            - --evm-stack-size={{ . }}
             {{- end }}
             {{- with .Values.settings.contractSizeLimit }}
-            - --contract-size-limit={{ . | quote }}
+            - --contract-size-limit={{ . }}
             {{- end }}
             - --accept-defaults
           {{- with .Values.resources }}

@@ -44,8 +44,25 @@ const DEFAULT_VALIDATOR_COUNT = 4;
 const DEFAULT_RPC_COUNT = 2;
 const OUTPUT_CHOICES: OutputType[] = ["screen", "file", "kubernetes"];
 
+// Normalizes CLI inputs wrapped by orchestrators that keep literal quotes.
+const stripSurroundingQuotes = (value: string): string => {
+  const trimmed = value.trim();
+  if (trimmed.length < 2) {
+    return trimmed;
+  }
+  const startsWithQuote = trimmed[0];
+  const endsWithQuote = trimmed.at(-1);
+  if (
+    (startsWithQuote === '"' || startsWithQuote === "'") &&
+    startsWithQuote === endsWithQuote
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+};
+
 const parsePositiveInteger = (value: string, label: string): number => {
-  const parsed = Number.parseInt(value, 10);
+  const parsed = Number.parseInt(stripSurroundingQuotes(value), 10);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new InvalidArgumentError(`${label} must be a positive integer.`);
   }
@@ -53,7 +70,7 @@ const parsePositiveInteger = (value: string, label: string): number => {
 };
 
 const parseNonNegativeInteger = (value: string, label: string): number => {
-  const parsed = Number.parseInt(value, 10);
+  const parsed = Number.parseInt(stripSurroundingQuotes(value), 10);
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new InvalidArgumentError(`${label} must be a non-negative integer.`);
   }
@@ -61,7 +78,7 @@ const parseNonNegativeInteger = (value: string, label: string): number => {
 };
 
 const parsePositiveBigInt = (value: string, label: string): string => {
-  const trimmed = value.trim();
+  const trimmed = stripSurroundingQuotes(value);
   try {
     const parsed = BigInt(trimmed);
     if (parsed <= 0n) {
@@ -202,7 +219,7 @@ const createCliCommand = (
       "-o, --outputType <type>",
       `Output target (${OUTPUT_CHOICES.join(", ")}).`,
       (value: string): OutputType => {
-        const normalized = value.toLowerCase();
+        const normalized = stripSurroundingQuotes(value).toLowerCase();
         if (OUTPUT_CHOICES.includes(normalized as OutputType)) {
           return normalized as OutputType;
         }
@@ -218,7 +235,7 @@ const createCliCommand = (
         ALGORITHM.QBFT
       })`,
       (value: string): Algorithm => {
-        const normalized = value.trim().toLowerCase();
+        const normalized = stripSurroundingQuotes(value).toLowerCase();
         const match = Object.values(ALGORITHM).find(
           (candidate) => candidate.toLowerCase() === normalized
         );
@@ -280,7 +297,15 @@ const createCliCommand = (
           : options.rpcNodes,
     };
 
-    await runBootstrap(normalizedOptions, deps);
+    const sanitizedOptions: CliOptions = {
+      ...normalizedOptions,
+      allocations:
+        normalizedOptions.allocations === undefined
+          ? undefined
+          : stripSurroundingQuotes(normalizedOptions.allocations),
+    };
+
+    await runBootstrap(sanitizedOptions, deps);
   });
 
   return command;

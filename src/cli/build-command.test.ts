@@ -338,6 +338,43 @@ describe("CLI command bootstrap", () => {
     );
   });
 
+  test("createCliCommand strips surrounding quotes from output type", async () => {
+    let capturedOutputType: OutputType | undefined;
+    const deps: BootstrapDependencies = {
+      factory: createFactoryStub(),
+      promptForCount: () => Promise.resolve(EXPECTED_DEFAULT_VALIDATOR),
+      promptForGenesis: async () => ({
+        algorithm: ALGORITHM.QBFT,
+        config: {
+          chainId: 1,
+          faucetWalletAddress: expectedAddress(CLI_FAUCET_INDEX),
+          gasLimit: "0x1",
+          gasPrice: 0,
+          secondsPerBlock: 2,
+        },
+        genesis: { config: {}, extraData: "0x" } as any,
+      }),
+      service: {} as any,
+      loadAllocations: () =>
+        Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      outputResult: (type) => {
+        capturedOutputType = type;
+        return Promise.resolve();
+      },
+    };
+
+    const command = createCliCommand(deps);
+    command.exitOverride();
+    await expect(
+      command.parseAsync(
+        ["node", "cli", '--outputType="kubernetes"', "--accept-defaults"],
+        { from: "node" }
+      )
+    ).resolves.toBeDefined();
+    expect(command.opts().outputType).toBe("kubernetes");
+    expect(capturedOutputType).toBe("kubernetes");
+  });
+
   test("createCliCommand rejects unsupported consensus", async () => {
     const command = createCliCommand();
     command.exitOverride();

@@ -26,6 +26,11 @@ serviceAccount:
   # If unset and `serviceAccount.create` is true, a name is derived from the chart fullname.
   name: ""
 
+# -- (object) RBAC resources granting ConfigMap access for Kubernetes output workflows.
+rbac:
+  # -- (bool) Whether to create Role and RoleBinding objects targeting the service account.
+  create: true
+
 # -- (object) Pod-level annotations merged onto the generated pod template metadata. See https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/.
 podAnnotations: {}
 # -- (object) Pod-level labels applied to the pod template metadata. See https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/.
@@ -91,7 +96,7 @@ settings:
   # -- (string) Filesystem path, accessible to the job, pointing to a JSON file with initial account allocations. Omit to skip pre-funded accounts.
   allocations:
   # -- (string) Destination for generated artefacts: `screen` (stdout), `file` (write to volume), or `kubernetes` (persist as Kubernetes secrets/configmaps). Default: "screen".
-  outputType:
+  outputType: kubernetes
   # -- (string) Consensus engine to configure for the network (IBFTv2 or QBFT). Default: "QBFT".
   consensus:
   # -- (int) Explicit chain ID applied to the genesis configuration. Defaults to a random value in the 40000-50000 range when omitted.
