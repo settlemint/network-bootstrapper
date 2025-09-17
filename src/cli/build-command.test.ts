@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { getAddress } from "viem";
+import { ARTIFACT_DEFAULTS } from "../constants/artifact-defaults.ts";
 import type { BesuAllocAccount } from "../genesis/besu-genesis.service.ts";
 import { ALGORITHM } from "../genesis/besu-genesis.service.ts";
 import type { GeneratedNodeKey } from "../keys/node-key-factory.ts";
@@ -16,11 +17,13 @@ const EXPECTED_DEFAULT_VALIDATOR = 4;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
 const CUSTOM_STATIC_NODE_PORT = 40_000;
 const LEADING_DOT_REGEX = /^\./u;
-const DEFAULT_SERVICE_NAME = "besu-node";
-const DEFAULT_POD_PREFIX = "besu-node-validator";
-const DEFAULT_GENESIS_CONFIGMAP_NAME = "besu-genesis";
-const DEFAULT_STATIC_NODES_CONFIGMAP_NAME = "besu-static-nodes";
-const DEFAULT_FAUCET_PREFIX = "besu-faucet";
+const {
+  staticNodeServiceName: DEFAULT_SERVICE_NAME,
+  staticNodePodPrefix: DEFAULT_POD_PREFIX,
+  genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
+  staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+  faucetArtifactPrefix: DEFAULT_FAUCET_PREFIX,
+} = ARTIFACT_DEFAULTS;
 const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
 const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
 const HEX_RADIX = 16;

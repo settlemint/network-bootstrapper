@@ -1,5 +1,5 @@
 import { Command, InvalidArgumentError } from "commander";
-
+import { ARTIFACT_DEFAULTS } from "../constants/artifact-defaults.ts";
 import {
   ALGORITHM,
   type Algorithm,
@@ -55,11 +55,13 @@ type BootstrapDependencies = {
 
 const DEFAULT_VALIDATOR_COUNT = 4;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
-const DEFAULT_STATIC_NODE_SERVICE_NAME = "besu-node";
-const DEFAULT_STATIC_NODE_POD_PREFIX = "besu-node-validator";
-const DEFAULT_GENESIS_CONFIGMAP_NAME = "besu-genesis";
-const DEFAULT_STATIC_NODES_CONFIGMAP_NAME = "besu-static-nodes";
-const DEFAULT_FAUCET_ARTIFACT_PREFIX = "besu-faucet";
+const {
+  staticNodeServiceName: DEFAULT_STATIC_NODE_SERVICE_NAME,
+  staticNodePodPrefix: DEFAULT_STATIC_NODE_POD_PREFIX,
+  genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
+  staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+  faucetArtifactPrefix: DEFAULT_FAUCET_ARTIFACT_PREFIX,
+} = ARTIFACT_DEFAULTS;
 const OUTPUT_CHOICES: OutputType[] = ["screen", "file", "kubernetes"];
 const LEADING_DOT_REGEX = /^\./u;
 const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
@@ -138,6 +140,81 @@ const normalizeStaticNodeNamespace = (
   const trimmed = namespace.trim();
   return trimmed.length === 0 ? undefined : trimmed;
 };
+
+type TextOptionKey =
+  | "staticNodeDomain"
+  | "staticNodeNamespace"
+  | "staticNodeServiceName"
+  | "staticNodePodPrefix"
+  | "genesisConfigmapName"
+  | "staticNodesConfigmapName"
+  | "faucetArtifactPrefix";
+
+type TextOptionDescriptor<T extends TextOptionKey> = {
+  key: T;
+  flag: string;
+  description: string;
+  parser?: (value: string) => CliOptions[T];
+  sanitize?: (value: NonNullable<CliOptions[T]>) => CliOptions[T] | undefined;
+};
+
+const TEXT_OPTION_DESCRIPTORS: TextOptionDescriptor<TextOptionKey>[] = [
+  {
+    key: "staticNodeDomain",
+    flag: "--static-node-domain <domain>",
+    description:
+      "DNS suffix appended to validator peer hostnames for static-nodes entries.",
+    parser: stripSurroundingQuotes,
+    sanitize: (value) => normalizeStaticNodeDomain(value) ?? undefined,
+  },
+  {
+    key: "staticNodeNamespace",
+    flag: "--static-node-namespace <name>",
+    description:
+      "Namespace segment inserted between service name and domain for static-nodes entries.",
+    parser: stripSurroundingQuotes,
+    sanitize: (value) => normalizeStaticNodeNamespace(value) ?? undefined,
+  },
+  {
+    key: "staticNodeServiceName",
+    flag: "--static-node-service-name <name>",
+    description:
+      "Headless Service name used when constructing static-nodes hostnames.",
+    parser: stripSurroundingQuotes,
+    sanitize: (value) => stripSurroundingQuotes(value),
+  },
+  {
+    key: "staticNodePodPrefix",
+    flag: "--static-node-pod-prefix <prefix>",
+    description:
+      "StatefulSet prefix used when constructing validator pod hostnames.",
+    parser: stripSurroundingQuotes,
+    sanitize: (value) => stripSurroundingQuotes(value),
+  },
+  {
+    key: "genesisConfigmapName",
+    flag: "--genesis-configmap-name <name>",
+    description:
+      "ConfigMap name that stores the generated genesis.json payload.",
+    parser: stripSurroundingQuotes,
+    sanitize: (value) => stripSurroundingQuotes(value),
+  },
+  {
+    key: "staticNodesConfigmapName",
+    flag: "--static-nodes-configmap-name <name>",
+    description:
+      "ConfigMap name that stores the generated static-nodes.json payload.",
+    parser: stripSurroundingQuotes,
+    sanitize: (value) => stripSurroundingQuotes(value),
+  },
+  {
+    key: "faucetArtifactPrefix",
+    flag: "--faucet-artifact-prefix <prefix>",
+    description: "Prefix applied to faucet ConfigMaps and Secrets.",
+    parser: stripSurroundingQuotes,
+    sanitize: (value) => stripSurroundingQuotes(value),
+  },
+];
 
 const deriveNodeId = (publicKey: string): string => {
   const trimmed = publicKey.startsWith("0x") ? publicKey.slice(2) : publicKey;
@@ -368,6 +445,16 @@ const createCliCommand = (
       "Generate node identities, configure consensus, and emit a Besu genesis."
     );
 
+  const identityParser = <T>(value: T): T => value;
+  for (const descriptor of TEXT_OPTION_DESCRIPTORS) {
+    const parser = descriptor.parser ?? identityParser;
+    generate.option(
+      descriptor.flag,
+      descriptor.description,
+      parser as (value: string) => unknown
+    );
+  }
+
   generate
     .option(
       "-v, --validators <count>",
@@ -394,16 +481,6 @@ const createCliCommand = (
       "screen"
     )
     .option(
-      "--static-node-domain <domain>",
-      "DNS suffix appended to validator peer hostnames for static-nodes entries.",
-      (value: string) => stripSurroundingQuotes(value)
-    )
-    .option(
-      "--static-node-namespace <name>",
-      "Namespace segment inserted between service name and domain for static-nodes entries.",
-      (value: string) => stripSurroundingQuotes(value)
-    )
-    .option(
       "--static-node-port <number>",
       "P2P port used for static-nodes enode URIs.",
       (value: string) => parsePositiveInteger(value, "Static node port"),
@@ -415,31 +492,6 @@ const createCliCommand = (
       (value: string) =>
         parseNonNegativeInteger(value, "Static node discovery port"),
       DEFAULT_STATIC_NODE_PORT
-    )
-    .option(
-      "--static-node-service-name <name>",
-      "Headless Service name used when constructing static-nodes hostnames.",
-      (value: string) => stripSurroundingQuotes(value)
-    )
-    .option(
-      "--static-node-pod-prefix <prefix>",
-      "StatefulSet prefix used when constructing validator pod hostnames.",
-      (value: string) => stripSurroundingQuotes(value)
-    )
-    .option(
-      "--genesis-configmap-name <name>",
-      "ConfigMap name that stores the generated genesis.json payload.",
-      (value: string) => stripSurroundingQuotes(value)
-    )
-    .option(
-      "--static-nodes-configmap-name <name>",
-      "ConfigMap name that stores the generated static-nodes.json payload.",
-      (value: string) => stripSurroundingQuotes(value)
-    )
-    .option(
-      "--faucet-artifact-prefix <prefix>",
-      "Prefix applied to faucet ConfigMaps and Secrets.",
-      (value: string) => stripSurroundingQuotes(value)
     )
     .option(
       "--consensus <algorithm>",
@@ -502,14 +554,6 @@ const createCliCommand = (
           cmd.getOptionValueSource("validators") === "default"
             ? undefined
             : options.validators,
-        staticNodeDomain:
-          cmd.getOptionValueSource("staticNodeDomain") === "default"
-            ? undefined
-            : options.staticNodeDomain,
-        staticNodeNamespace:
-          cmd.getOptionValueSource("staticNodeNamespace") === "default"
-            ? undefined
-            : options.staticNodeNamespace,
         staticNodePort:
           cmd.getOptionValueSource("staticNodePort") === "default"
             ? undefined
@@ -518,27 +562,13 @@ const createCliCommand = (
           cmd.getOptionValueSource("staticNodeDiscoveryPort") === "default"
             ? undefined
             : options.staticNodeDiscoveryPort,
-        staticNodeServiceName:
-          cmd.getOptionValueSource("staticNodeServiceName") === "default"
-            ? undefined
-            : options.staticNodeServiceName,
-        staticNodePodPrefix:
-          cmd.getOptionValueSource("staticNodePodPrefix") === "default"
-            ? undefined
-            : options.staticNodePodPrefix,
-        genesisConfigmapName:
-          cmd.getOptionValueSource("genesisConfigmapName") === "default"
-            ? undefined
-            : options.genesisConfigmapName,
-        staticNodesConfigmapName:
-          cmd.getOptionValueSource("staticNodesConfigmapName") === "default"
-            ? undefined
-            : options.staticNodesConfigmapName,
-        faucetArtifactPrefix:
-          cmd.getOptionValueSource("faucetArtifactPrefix") === "default"
-            ? undefined
-            : options.faucetArtifactPrefix,
       };
+
+      for (const { key } of TEXT_OPTION_DESCRIPTORS) {
+        if (cmd.getOptionValueSource(key) === "default") {
+          normalizedOptions[key] = undefined;
+        }
+      }
 
       const sanitizedOptions: CliOptions = {
         ...normalizedOptions,
@@ -546,35 +576,26 @@ const createCliCommand = (
           normalizedOptions.allocations === undefined
             ? undefined
             : stripSurroundingQuotes(normalizedOptions.allocations),
-        staticNodeDomain: normalizeStaticNodeDomain(
-          normalizedOptions.staticNodeDomain
-        ),
-        staticNodeNamespace: normalizeStaticNodeNamespace(
-          normalizedOptions.staticNodeNamespace
-        ),
-        staticNodeServiceName:
-          normalizedOptions.staticNodeServiceName === undefined
-            ? undefined
-            : stripSurroundingQuotes(normalizedOptions.staticNodeServiceName),
-        staticNodePodPrefix:
-          normalizedOptions.staticNodePodPrefix === undefined
-            ? undefined
-            : stripSurroundingQuotes(normalizedOptions.staticNodePodPrefix),
-        genesisConfigmapName:
-          normalizedOptions.genesisConfigmapName === undefined
-            ? undefined
-            : stripSurroundingQuotes(normalizedOptions.genesisConfigmapName),
-        staticNodesConfigmapName:
-          normalizedOptions.staticNodesConfigmapName === undefined
-            ? undefined
-            : stripSurroundingQuotes(
-                normalizedOptions.staticNodesConfigmapName
-              ),
-        faucetArtifactPrefix:
-          normalizedOptions.faucetArtifactPrefix === undefined
-            ? undefined
-            : stripSurroundingQuotes(normalizedOptions.faucetArtifactPrefix),
       };
+
+      for (const { key, sanitize } of TEXT_OPTION_DESCRIPTORS) {
+        const currentValue = normalizedOptions[key];
+        if (currentValue === undefined) {
+          sanitizedOptions[key] = undefined;
+          continue;
+        }
+
+        if (!sanitize) {
+          sanitizedOptions[key] = currentValue;
+          continue;
+        }
+
+        const sanitizedValue = sanitize(
+          currentValue as NonNullable<CliOptions[typeof key]>
+        );
+        sanitizedOptions[key] = (sanitizedValue ??
+          undefined) as CliOptions[typeof key];
+      }
 
       await runBootstrap(sanitizedOptions, deps);
     });
