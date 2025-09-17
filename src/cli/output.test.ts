@@ -123,7 +123,7 @@ const staticNodeUri = (
       : namespace.trim();
   const ordinal = node.index - 1;
   const podName = `besu-node-validator-${ordinal}`;
-  const serviceName = "besu-node-validator";
+  const serviceName = "besu-node";
   const segments = [podName, serviceName];
   if (trimmedNamespace) {
     segments.push(trimmedNamespace);

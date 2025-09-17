@@ -12,7 +12,7 @@ imagePullSecrets: []
 # -- (string) Short name override applied to chart-scoped resource names.
 nameOverride: ""
 # -- (string) Fully qualified name override for resources created by this release.
-fullnameOverride: ""
+fullnameOverride: "bootstrapper"
 
 # -- (object) Service account configuration for the bootstrapper pod. See https://kubernetes.io/docs/concepts/security/service-accounts/ for details.
 serviceAccount:

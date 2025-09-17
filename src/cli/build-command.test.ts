@@ -73,7 +73,7 @@ const expectedStaticNodeUri = (
       : namespace.trim();
   const ordinal = index - 1;
   const podName = `besu-node-validator-${ordinal}`;
-  const serviceName = "besu-node-validator";
+  const serviceName = "besu-node";
   const segments = [podName, serviceName];
   if (normalizedNamespace) {
     segments.push(normalizedNamespace);

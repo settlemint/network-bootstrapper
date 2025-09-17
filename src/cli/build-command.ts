@@ -156,7 +156,7 @@ const createStaticNodeEntries = (
     // StatefulSet pod ordinals start at 0 even though our generator indexes start at 1.
     const ordinal = node.index - 1;
     const podName = `besu-node-validator-${ordinal}`;
-    const serviceName = "besu-node-validator";
+    const serviceName = "besu-node"; // Headless service fronting validator pods
     const segments = [podName, serviceName];
     if (normalizedNamespace) {
       segments.push(normalizedNamespace);

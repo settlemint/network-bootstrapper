@@ -4,6 +4,7 @@ metadata:
   name: {{ include "nodes.fullname" . }}-rpc
   labels:
     {{- include "nodes.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rpc
 spec:
   {{- $root := . }}
   {{- $persistence := .Values.persistence | default (dict) }}
@@ -29,7 +30,7 @@ spec:
   {{- $rpcReplicaBudget := .Values.rpcReplicaCount | int }}
   podManagementPolicy: Parallel
   replicas: {{ .Values.rpcReplicaCount }}
-  serviceName: {{ include "nodes.fullname" . }}
+  serviceName: {{ include "nodes.fullname" . }}-rpc
   {{- if and $useClaimTemplate (or (ne $whenDeleted "") (ne $whenScaled "")) }}
   persistentVolumeClaimRetentionPolicy:
     {{- if ne $whenDeleted "" }}
@@ -42,6 +43,7 @@ spec:
   selector:
     matchLabels:
       {{- include "nodes.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: rpc
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -50,6 +52,7 @@ spec:
       {{- end }}
       labels:
         {{- include "nodes.labels" . | nindent 8 }}
+        app.kubernetes.io/component: rpc
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
