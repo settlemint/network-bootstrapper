@@ -351,13 +351,13 @@ readinessProbe:
   # HTTP GET probe configuration hitting the Besu readiness endpoint.
   httpGet:
     # -- (string) HTTP path used for readiness probing, including peer/sync thresholds.
-    path: /readiness?minPeers=0&maxBlocksBehind=100
+    path: /readiness?minPeers=1&maxBlocksBehind=100
     # -- (string|int) Target container port serving the readiness endpoint.
     port: json-rpc
   # -- (int) Seconds to wait before starting readiness checks.
   initialDelaySeconds: 15
   # -- (int) Frequency of readiness checks in seconds.
-  periodSeconds: 10
+  periodSeconds: 5
   # -- (int) Timeout in seconds before marking the probe as failed.
   timeoutSeconds: 2
   # -- (int) Consecutive failures required before the pod is considered unready.
