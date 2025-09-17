@@ -279,6 +279,13 @@ jobs:
           git config user.name "SettleMint Release Bot"
           git config user.email "support@settlemint.com"
 
+      - name: Fetch gh-pages reference for chart releaser
+        if: |
+          github.event_name == 'push' &&
+          startsWith(github.ref, 'refs/tags/')
+        run: |
+          git fetch origin gh-pages:refs/remotes/origin/gh-pages
+
       - name: Publish Helm charts with chart-releaser
         if: |
           github.event_name == 'push' &&
