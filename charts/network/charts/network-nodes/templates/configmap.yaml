@@ -8,6 +8,7 @@ metadata:
 {{- $persistenceEnabled := default false (get $persistence "enabled") }}
 {{- $mountPath := default "" (get $persistence "mountPath") }}
 {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
+{{- $logFormat := default "plain" .Values.config.logFormat }}
 data:
   config.toml: |-
     data-path="/data"
@@ -61,3 +62,21 @@ data:
     metrics-host={{ .Values.config.metrics.host | quote }}
     metrics-port={{ .Values.service.ports.metrics | int }}
     metrics-category={{ .Values.config.metrics.categories | toJson }}
+  {{- if eq $logFormat "json" }}
+  log-config.xml: |-
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Configuration status="INFO" monitorInterval="5">
+      <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+          <JsonLayout compact="false" eventEol="true" properties="true" stacktrace="true">
+            <KeyValuePair key="container" value="${hostName}" />
+          </JsonLayout>
+        </Console>
+      </Appenders>
+      <Loggers>
+        <Root level="{{ .Values.config.logging }}">
+          <AppenderRef ref="Console" />
+        </Root>
+      </Loggers>
+    </Configuration>
+  {{- end }}

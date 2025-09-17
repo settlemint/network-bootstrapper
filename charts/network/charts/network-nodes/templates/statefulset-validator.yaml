@@ -76,6 +76,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+{{- $log4jEnv := include "nodes.log4jEnv" . }}
+{{- if $log4jEnv }}
+{{ $log4jEnv | nindent 12 }}
+{{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -132,6 +136,10 @@ spec:
               mountPath: /etc/besu/config.toml
               subPath: config.toml
               readOnly: true
+{{- $log4jMount := include "nodes.log4jVolumeMount" . }}
+{{- if $log4jMount }}
+{{ $log4jMount | nindent 12 }}
+{{- end }}
             - name: besu-genesis
               mountPath: /etc/besu/genesis.json
               subPath: genesis.json
