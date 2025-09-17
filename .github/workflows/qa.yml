@@ -192,9 +192,18 @@ jobs:
           CT_CONFIG: .github/ct.yaml
         run: ct lint --config "$CT_CONFIG" --validate-yaml=false
 
-      - name: Create kind cluster
+      - name: Configure Namespace access
         if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        id: nscloud
+        uses: namespacelabs/nscloud-setup@v0
+
+      - name: Provision Namespace Kubernetes cluster
+        if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
+        uses: namespacelabs/nscloud-cluster-action@v0
+        with:
+          wait-kube-system: "true"
+          machine-shape: "4x16"
+          duration: "20m"
 
       - name: Run chart-testing (install)
         if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
