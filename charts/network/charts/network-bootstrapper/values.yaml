@@ -85,17 +85,14 @@ tolerations: []
 # Affinity and anti-affinity rules influencing pod placement.
 affinity: {}
 
-# -- (string) Kubernetes DNS suffix appended to generated static node hostnames when unset by the CLI.
-clusterDomain: svc.cluster.local
-
-# -- (int) Default TCP P2P port used in generated enode URIs when no override is provided.
-defaultStaticNodePort: 30303
-
-# -- (int) Default UDP discovery port used in generated enode URIs when no override is provided.
-defaultStaticNodeDiscoveryPort: 30303
-
 # Settings passed to the network-bootstrapper CLI executed by the job.
 settings:
+  # -- (string) Kubernetes DNS suffix appended to generated static node hostnames when unset by the CLI.
+  clusterDomain: svc.cluster.local
+  # -- (int) Default TCP P2P port used in generated enode URIs when no override is provided.
+  defaultStaticNodePort: 30303
+  # -- (int) Default UDP discovery port used in generated enode URIs when no override is provided.
+  defaultStaticNodeDiscoveryPort: 30303
   # -- (int) Number of validator identities to generate (default 4).
   validators:
   # -- (string) DNS suffix appended to generated static node hostnames.
