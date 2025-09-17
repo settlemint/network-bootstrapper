@@ -274,9 +274,13 @@ function updateWorkspaceDependencies(
  */
 function updateChartDependencies(
   dependencies:
-    | Array<{ name: string; version: string; [key: string]: unknown }>
-    | undefined,
-  newVersion: string
+    | Array<{
+        name: string;
+        version: string;
+        repository?: string;
+        [key: string]: unknown;
+      }>
+    | undefined
 ): number {
   if (!dependencies) {
     return 0;
@@ -284,8 +288,8 @@ function updateChartDependencies(
 
   let dependencyCount = 0;
   for (const dep of dependencies) {
-    if (dep.version === "*") {
-      dep.version = newVersion;
+    if (dep.version !== "*") {
+      dep.version = "*";
       dependencyCount++;
     }
   }
@@ -467,15 +471,14 @@ async function updateChartVersions(
             }
 
             const dependencyUpdates = updateChartDependencies(
-              chart.dependencies,
-              newVersion
+              chart.dependencies
             );
 
             if (dependencyUpdates > 0) {
               logs.push(
-                `Updated ${dependencyUpdates} chart dependenc${
+                `Set ${dependencyUpdates} chart dependenc${
                   dependencyUpdates === 1 ? "y" : "ies"
-                } pinned to "*"`
+                } to "*"`
               );
             }
 

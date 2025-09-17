@@ -278,6 +278,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           charts_dir: charts
+          commit_username: SettleMint Release Bot
+          commit_email: support@settlemint.com
 
       # Check PR review status (PR and PR review events only)
       - name: Check PR review status
