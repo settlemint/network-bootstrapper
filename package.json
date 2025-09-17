@@ -2,7 +2,7 @@
   "name": "network-bootstrapper",
   "module": "src/index.ts",
   "type": "module",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "private": false,
   "license": "FSL-1.1-MIT",
   "author": {
