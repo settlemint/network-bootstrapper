@@ -200,7 +200,7 @@ jobs:
         if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
         env:
           CT_CONFIG: .github/ct.yaml
-        run: ct install --config "$CT_CONFIG"
+        run: ct install --config "$CT_CONFIG" --skip-clean-up
 
       # Label QA results (PR only)
       - name: Label QA build status
