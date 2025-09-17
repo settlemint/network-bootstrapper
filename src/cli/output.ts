@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { Cluster, V1ConfigMap } from "@kubernetes/client-node";
+import type { V1ConfigMap } from "@kubernetes/client-node";
 import { CoreV1Api, KubeConfig } from "@kubernetes/client-node";
 
 import type { GeneratedNodeKey } from "../keys/node-key-factory.ts";
@@ -169,23 +169,10 @@ const createKubernetesClient = async (): Promise<{
   client: CoreV1Api;
   namespace: string;
 }> => {
+  Bun.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   const kubeConfig = new KubeConfig();
   try {
     kubeConfig.loadFromCluster();
-    const cluster = kubeConfig.getCurrentCluster();
-    if (cluster) {
-      // Allow self-signed control plane certificates inside the target cluster.
-      const insecureCluster: Cluster = {
-        name: cluster.name,
-        caData: cluster.caData,
-        caFile: cluster.caFile,
-        server: cluster.server,
-        tlsServerName: cluster.tlsServerName,
-        skipTLSVerify: true,
-        proxyUrl: cluster.proxyUrl,
-      };
-      kubeConfig.clusters = [insecureCluster];
-    }
   } catch (_error) {
     throw new Error(
       "Kubernetes output requires running inside a cluster with service account credentials."

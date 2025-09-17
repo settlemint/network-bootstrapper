@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { appendFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { Glob } from "bun";
 import { parse, stringify } from "yaml";
 
@@ -40,6 +40,69 @@ type ChartYaml = {
   }>;
   [key: string]: unknown;
 };
+
+type UpdateResult = {
+  changed: boolean;
+  logs?: string[];
+};
+
+const toPosixPath = (value: string): string => value.replaceAll("\\", "/");
+
+async function scanFiles(
+  pattern: string,
+  exclude: string[],
+  cwd: string
+): Promise<string[]> {
+  const glob = new Glob(pattern);
+  const files: string[] = [];
+
+  for await (const file of glob.scan(cwd)) {
+    const normalized = toPosixPath(file);
+    if (exclude.some((entry) => normalized.includes(entry))) {
+      continue;
+    }
+    files.push(file);
+  }
+
+  return files;
+}
+
+async function processFile<T>({
+  filePath,
+  read,
+  update,
+  write,
+}: {
+  filePath: string;
+  read: (raw: string) => T;
+  update: (data: T, filePath: string) => UpdateResult;
+  write: (data: T) => string;
+}): Promise<boolean> {
+  const file = Bun.file(filePath);
+
+  if (!(await file.exists())) {
+    console.warn(`    Skipping: ${filePath} does not exist`);
+    return false;
+  }
+
+  const raw = await file.text();
+  const data = read(raw);
+  const { changed, logs } = update(data, filePath);
+
+  if (!changed) {
+    console.log("    No changes needed");
+    return false;
+  }
+
+  await Bun.write(filePath, write(data));
+  if (logs?.length) {
+    for (const line of logs) {
+      console.log(`    ${line}`);
+    }
+  }
+  console.log(`    ✔ ${filePath}`);
+  return true;
+}
 
 async function findPackageJsonPath(startPath?: string): Promise<string> {
   const resolvedPath = resolve(startPath ?? ".");
@@ -227,12 +290,6 @@ function updateChartDependencies(
     }
   }
 
-  if (dependencyCount > 0) {
-    console.log(
-      `    Updated ${dependencyCount} "*" version references in chart dependencies`
-    );
-  }
-
   return dependencyCount;
 }
 
@@ -253,21 +310,12 @@ export async function updatePackageVersion(
     const newVersion = versionInfo.version;
 
     console.log(`Updating all package.json files to version: ${newVersion}`);
-
-    // Find all package.json files in the workspace, excluding node_modules
-    const glob = new Glob("**/package.json");
-    const packageFiles: string[] = [];
-
-    for await (const file of glob.scan(startPath || ".")) {
-      // Skip files in node_modules and kit/contracts/dependencies directories
-      if (
-        file.includes("node_modules/") ||
-        file.includes("kit/contracts/dependencies/")
-      ) {
-        continue;
-      }
-      packageFiles.push(file);
-    }
+    const cwd = resolve(startPath ?? ".");
+    const packageFiles = await scanFiles(
+      "**/package.json",
+      ["node_modules/", "kit/contracts/dependencies/"],
+      cwd
+    );
 
     if (packageFiles.length === 0) {
       console.warn("No package.json files found");
@@ -282,78 +330,70 @@ export async function updatePackageVersion(
       try {
         console.log(`  Processing: ${packagePath}`);
 
-        // Read the current package.json file
-        const packageJsonFile = Bun.file(packagePath);
-        if (!(await packageJsonFile.exists())) {
-          console.warn("    Skipping: File does not exist");
-          continue;
-        }
+        const changed = await processFile<PackageJson>({
+          filePath: packagePath,
+          read: (raw) => JSON.parse(raw) as PackageJson,
+          update: (packageJson) => {
+            if (!packageJson.version) {
+              console.warn("    Skipping: No version field found");
+              return { changed: false };
+            }
 
-        const packageJson = (await packageJsonFile.json()) as PackageJson;
+            const logs: string[] = [];
+            const oldVersion = packageJson.version;
+            const versionChanged = oldVersion !== newVersion;
 
-        if (!packageJson.version) {
-          console.warn("    Skipping: No version field found");
-          continue;
-        }
+            if (versionChanged) {
+              packageJson.version = newVersion;
+              logs.push(`Updated version: ${oldVersion} -> ${newVersion}`);
+            }
 
-        const oldVersion = packageJson.version;
-        const versionChanged = oldVersion !== newVersion;
+            const workspaceUpdates = [
+              updateWorkspaceDependencies(
+                packageJson.dependencies as Record<string, string>,
+                "dependencies",
+                newVersion
+              ),
+              updateWorkspaceDependencies(
+                packageJson.devDependencies as Record<string, string>,
+                "devDependencies",
+                newVersion
+              ),
+              updateWorkspaceDependencies(
+                packageJson.peerDependencies as Record<string, string>,
+                "peerDependencies",
+                newVersion
+              ),
+              updateWorkspaceDependencies(
+                packageJson.optionalDependencies as Record<string, string>,
+                "optionalDependencies",
+                newVersion
+              ),
+            ];
 
-        if (versionChanged) {
-          packageJson.version = newVersion;
-        }
-
-        // Update workspace dependencies in all dependency types
-        const workspaceUpdates = [
-          updateWorkspaceDependencies(
-            packageJson.dependencies as Record<string, string>,
-            "dependencies",
-            newVersion
-          ),
-          updateWorkspaceDependencies(
-            packageJson.devDependencies as Record<string, string>,
-            "devDependencies",
-            newVersion
-          ),
-          updateWorkspaceDependencies(
-            packageJson.peerDependencies as Record<string, string>,
-            "peerDependencies",
-            newVersion
-          ),
-          updateWorkspaceDependencies(
-            packageJson.optionalDependencies as Record<string, string>,
-            "optionalDependencies",
-            newVersion
-          ),
-        ];
-
-        const totalWorkspaceUpdates = workspaceUpdates.reduce(
-          (sum, count) => sum + count,
-          0
-        );
-
-        const shouldWrite = versionChanged || totalWorkspaceUpdates > 0;
-
-        if (shouldWrite) {
-          // Write the updated package.json back to disk
-          await Bun.write(
-            packagePath,
-            `${JSON.stringify(packageJson, null, 2)}\n`
-          );
-
-          if (versionChanged) {
-            console.log(`    Updated version: ${oldVersion} -> ${newVersion}`);
-          } else {
-            console.log(`    Version already at ${newVersion}`);
-          }
-          if (totalWorkspaceUpdates > 0) {
-            console.log(
-              `    Updated ${totalWorkspaceUpdates} total workspace:* references`
+            const totalWorkspaceUpdates = workspaceUpdates.reduce(
+              (sum, count) => sum + count,
+              0
             );
-          }
+
+            if (totalWorkspaceUpdates > 0) {
+              logs.push(
+                `Updated ${totalWorkspaceUpdates} workspace:* reference${
+                  totalWorkspaceUpdates === 1 ? "" : "s"
+                }`
+              );
+            }
+
+            return {
+              changed: versionChanged || totalWorkspaceUpdates > 0,
+              logs,
+            };
+          },
+          write: (packageJson) => `${JSON.stringify(packageJson, null, 2)}\n`,
+        });
+
+        if (changed) {
           updatedCount++;
-        } else {
-          console.log("    No changes needed");
         }
       } catch (err) {
         console.error(`    Error processing ${packagePath}:`, err);
@@ -380,13 +420,11 @@ async function updateChartVersions(
 
     console.log(`Updating charts to version: ${newVersion}`);
 
-    // Find all Chart.yaml files in the ATK directory
-    const glob = new Glob("charts/**/Chart.yaml");
-    const chartFiles: string[] = [];
-
-    for await (const file of glob.scan(".")) {
-      chartFiles.push(file);
-    }
+    const chartFiles = await scanFiles(
+      "charts/**/Chart.yaml",
+      [],
+      process.cwd()
+    );
 
     if (chartFiles.length === 0) {
       console.warn("No Chart.yaml files found in charts/");
@@ -399,66 +437,59 @@ async function updateChartVersions(
 
     for (const chartPath of chartFiles) {
       try {
-        const relativePath = relative(process.cwd(), chartPath);
-        console.log(`  Processing: ${relativePath}`);
+        const changed = await processFile<ChartYaml>({
+          filePath: chartPath,
+          read: (raw) => parse(raw) as ChartYaml,
+          update: (chart) => {
+            if (!(chart.version || chart.appVersion)) {
+              console.warn(
+                "    Skipping: No version or appVersion fields found"
+              );
+              return { changed: false };
+            }
 
-        // Read the current Chart.yaml file
-        const file = Bun.file(chartPath);
-        if (!(await file.exists())) {
-          console.warn("    Skipping: File does not exist");
-          continue;
-        }
+            const logs: string[] = [];
+            const versionChanged =
+              typeof chart.version === "string" && chart.version !== newVersion;
+            const appVersionChanged =
+              typeof chart.appVersion === "string" &&
+              chart.appVersion !== newVersion;
 
-        const content = await file.text();
-        const chart = parse(content) as ChartYaml;
+            if (versionChanged) {
+              logs.push(`Updated version: ${chart.version} -> ${newVersion}`);
+              chart.version = newVersion;
+            }
+            if (appVersionChanged) {
+              logs.push(
+                `Updated appVersion: ${chart.appVersion} -> ${newVersion}`
+              );
+              chart.appVersion = newVersion;
+            }
 
-        // Check if version fields exist
-        if (!(chart.version || chart.appVersion)) {
-          console.warn("    Skipping: No version or appVersion fields found");
-          continue;
-        }
-
-        const oldVersion = chart.version;
-        const oldAppVersion = chart.appVersion;
-        const versionChanged = Boolean(
-          chart.version && chart.version !== newVersion
-        );
-        const appVersionChanged = Boolean(
-          chart.appVersion && chart.appVersion !== newVersion
-        );
-
-        if (versionChanged && chart.version) {
-          chart.version = newVersion;
-        }
-        if (appVersionChanged && chart.appVersion) {
-          chart.appVersion = newVersion;
-        }
-
-        // Update chart dependencies with version "*"
-        const dependencyUpdates = updateChartDependencies(
-          chart.dependencies,
-          newVersion
-        );
-
-        const hasChanges =
-          versionChanged || appVersionChanged || dependencyUpdates > 0;
-
-        if (hasChanges) {
-          // Convert back to YAML and write
-          const updatedContent = stringify(chart);
-          await Bun.write(chartPath, updatedContent);
-
-          if (oldVersion && oldVersion !== newVersion) {
-            console.log(`    Updated version: ${oldVersion} -> ${newVersion}`);
-          }
-          if (oldAppVersion && oldAppVersion !== newVersion) {
-            console.log(
-              `    Updated appVersion: ${oldAppVersion} -> ${newVersion}`
+            const dependencyUpdates = updateChartDependencies(
+              chart.dependencies,
+              newVersion
             );
-          }
+
+            if (dependencyUpdates > 0) {
+              logs.push(
+                `Updated ${dependencyUpdates} chart dependenc${
+                  dependencyUpdates === 1 ? "y" : "ies"
+                } pinned to "*"`
+              );
+            }
+
+            return {
+              changed:
+                versionChanged || appVersionChanged || dependencyUpdates > 0,
+              logs,
+            };
+          },
+          write: (chart) => `${stringify(chart)}\n`,
+        });
+
+        if (changed) {
           updatedCount++;
-        } else {
-          console.log("    No changes needed");
         }
       } catch (err) {
         console.error(`    Error processing ${chartPath}:`, err);
@@ -503,9 +534,14 @@ async function persistGithubContext(versionInfo: VersionInfo): Promise<void> {
 
 // Run the script if called directly
 if (import.meta.main) {
-  // Check if running in CI environment
-  if (!process.env.CI) {
-    console.log("Set the CI environment variable to run this script.");
+  const args = new Set(Bun.argv.slice(2));
+  const allowLocal = args.has("--allow-local") || args.has("--force");
+
+  // Check if running in CI environment unless explicitly overridden
+  if (!(process.env.CI || allowLocal)) {
+    console.log(
+      "Set the CI environment variable or rerun with --allow-local to execute this script."
+    );
     process.exit(0);
   }
 
