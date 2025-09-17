@@ -102,8 +102,12 @@ A Helm chart for Kubernetes
 | ingress.hosts[0].paths[0].path | string | `"/"` |  |
 | ingress.hosts[0].paths[0].pathType | string | `"ImplementationSpecific"` |  |
 | ingress.tls | list | `[]` |  |
-| livenessProbe.httpGet.path | string | `"/"` |  |
-| livenessProbe.httpGet.port | string | `"http"` |  |
+| livenessProbe.failureThreshold | int | `3` |  |
+| livenessProbe.httpGet.path | string | `"/liveness"` |  |
+| livenessProbe.httpGet.port | string | `"json-rpc"` |  |
+| livenessProbe.initialDelaySeconds | int | `30` |  |
+| livenessProbe.periodSeconds | int | `10` |  |
+| livenessProbe.timeoutSeconds | int | `2` |  |
 | nameOverride | string | `""` |  |
 | nodeSelector | object | `{}` |  |
 | openShiftRoute | object | `{"alternateBackends":[],"annotations":{},"enabled":false,"host":"","path":"","port":{"targetPort":"http"},"tls":null,"to":{"weight":100},"wildcardPolicy":""}` | Expose the service via OpenShift Route when running on OpenShift clusters     This relies on the OpenShift router to make the network nodes reachable externally. |
@@ -121,11 +125,18 @@ A Helm chart for Kubernetes
 | persistence.subPath | string | `""` |  |
 | persistence.volumeMode | string | `""` |  |
 | persistence.volumeName | string | `"data"` |  |
-| podAnnotations | object | `{}` |  |
+| podAnnotations."prometheus.io/path" | string | `"/metrics"` |  |
+| podAnnotations."prometheus.io/port" | string | `"9545"` |  |
+| podAnnotations."prometheus.io/scheme" | string | `"http"` |  |
+| podAnnotations."prometheus.io/scrape" | string | `"true"` |  |
 | podLabels | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
-| readinessProbe.httpGet.path | string | `"/"` |  |
-| readinessProbe.httpGet.port | string | `"http"` |  |
+| readinessProbe.failureThreshold | int | `3` |  |
+| readinessProbe.httpGet.path | string | `"/readiness?minPeers=0&maxBlocksBehind=100"` |  |
+| readinessProbe.httpGet.port | string | `"json-rpc"` |  |
+| readinessProbe.initialDelaySeconds | int | `15` |  |
+| readinessProbe.periodSeconds | int | `10` |  |
+| readinessProbe.timeoutSeconds | int | `2` |  |
 | resources | object | `{}` |  |
 | rpcReplicaCount | int | `2` |  |
 | securityContext | object | `{}` |  |
