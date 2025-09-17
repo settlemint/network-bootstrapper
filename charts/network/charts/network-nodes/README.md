@@ -90,7 +90,13 @@ A Helm chart for Kubernetes
 | config.ws.maxActiveConnections | int | `2000` |  |
 | config.ws.maxFrameSize | int | `2097152` |  |
 | fullnameOverride | string | `"besu-node"` |  |
-| httpRoute | object | `{"annotations":{},"enabled":false,"hostnames":["chart-example.local"],"parentRefs":[{"name":"gateway","sectionName":"http"}],"rules":[{"matches":[{"path":{"type":"PathPrefix","value":"/headers"}}]}]}` | Expose the service via gateway-api HTTPRoute Requires Gateway API resources and suitable controller installed within the cluster (see: https://gateway-api.sigs.k8s.io/guides/) |
+| httpRoute.annotations | object | `{}` |  |
+| httpRoute.enabled | bool | `false` |  |
+| httpRoute.hostnames[0] | string | `"chart-example.local"` |  |
+| httpRoute.parentRefs[0].name | string | `"gateway"` |  |
+| httpRoute.parentRefs[0].sectionName | string | `"http"` |  |
+| httpRoute.rules[0].matches[0].path.type | string | `"PathPrefix"` |  |
+| httpRoute.rules[0].matches[0].path.value | string | `"/headers"` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"docker.io/hyperledger/besu"` |  |
 | image.tag | string | `"25.8.0"` |  |
@@ -110,7 +116,15 @@ A Helm chart for Kubernetes
 | livenessProbe.timeoutSeconds | int | `2` |  |
 | nameOverride | string | `""` |  |
 | nodeSelector | object | `{}` |  |
-| openShiftRoute | object | `{"alternateBackends":[],"annotations":{},"enabled":false,"host":"","path":"","port":{"targetPort":"http"},"tls":null,"to":{"weight":100},"wildcardPolicy":""}` | Expose the service via OpenShift Route when running on OpenShift clusters     This relies on the OpenShift router to make the network nodes reachable externally. |
+| openShiftRoute.alternateBackends | list | `[]` |  |
+| openShiftRoute.annotations | object | `{}` |  |
+| openShiftRoute.enabled | bool | `false` |  |
+| openShiftRoute.host | string | `""` |  |
+| openShiftRoute.path | string | `""` |  |
+| openShiftRoute.port.targetPort | string | `"http"` |  |
+| openShiftRoute.tls | string | `nil` |  |
+| openShiftRoute.to.weight | int | `100` |  |
+| openShiftRoute.wildcardPolicy | string | `""` |  |
 | persistence.accessModes[0] | string | `"ReadWriteOnce"` |  |
 | persistence.annotations | object | `{}` |  |
 | persistence.enabled | bool | `false` |  |
