@@ -77,6 +77,9 @@ A Helm chart for Kubernetes
 | ingress.enabled | bool | `false` | Enable creation of an Ingress resource. |
 | ingress.hosts | list | `[{"host":"chart-example.local","paths":[{"path":"/","pathType":"ImplementationSpecific"}]}]` | Hostname and path routing rules for the Ingress. |
 | ingress.tls | list | `[]` | TLS configuration for Ingress hosts. |
+| initContainers.rpc | list|string | `[]` | Additional init containers exclusively for RPC pods. |
+| initContainers.shared | list|string | `[]` | Init containers applied to both validator and RPC pods. |
+| initContainers.validator | list|string | `[]` | Additional init containers exclusively for validator pods. |
 | livenessProbe.failureThreshold | int | `3` | Consecutive failures required before the container is restarted. |
 | livenessProbe.httpGet.path | string | `"/liveness"` | HTTP path used for liveness probing. |
 | livenessProbe.httpGet.port | string|int | `"json-rpc"` | Target container port serving the liveness endpoint. |
