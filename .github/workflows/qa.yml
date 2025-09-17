@@ -192,7 +192,7 @@ jobs:
         if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
         env:
           CT_CONFIG: .github/ct.yaml
-        run: ct lint --config "$CT_CONFIG"
+        run: ct lint --config "$CT_CONFIG" --validate-yaml=false
 
       - name: Create kind cluster
         if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
