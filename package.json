@@ -21,8 +21,11 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "check": "biome check src --write",
-    "test": "bun test"
+    "check": "ultracite check",
+    "check:fix": "ultracite fix",
+    "test": "bun test",
+    "docs:helm": "helm-docs --chart-search-root=. --skip-version-footer",
+    "docs:cli": "cat README.tpl > README.md && echo '\n```' >> README.md && bun src/index.ts --help >> README.md && echo '```' >> README.md"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
@@ -36,6 +39,7 @@
     "@inquirer/prompts": "7.8.6",
     "@kubernetes/client-node": "1.3.0",
     "commander": "14.0.1",
+    "lefthook": "^1.13.0",
     "ox": "0.9.6",
     "viem": "2.37.6",
     "yaml": "^2.8.1",

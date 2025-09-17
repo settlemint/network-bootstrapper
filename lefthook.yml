@@ -1,0 +1,11 @@
+pre-commit:
+  commands:
+    check_fix:
+      run: bun run check:fix || true
+      stage_fixed: true
+    docs_cli:
+      run: bun run docs:cli || true
+      stage_fixed: true
+    docs_helm:
+      run: bun run docs:helm || true
+      stage_fixed: true

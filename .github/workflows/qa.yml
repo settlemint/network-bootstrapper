@@ -124,6 +124,10 @@ jobs:
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         run: bun run tools/version.ts
 
+      - name: Run docs
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        run: bun run docs:helm
+
       - name: Docker meta
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         id: meta

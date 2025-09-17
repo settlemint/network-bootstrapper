@@ -1,15 +1,30 @@
 # network-bootstrapper
 
-To install dependencies:
+Generate node identities, configure consensus, and emit a Besu genesis.
 
-```bash
-bun install
+## Helm chart
+
+The helm chart to run this on Kubernetes / OpenShift can be found [here](./charts/network-bootstrapper/README.md)
+
+## CLI usage
+
 ```
+Usage: network-bootstrapper [options]
 
-To run:
+Generate node identities, configure consensus, and emit a Besu genesis.
 
-```bash
-bun run src/index.ts
+Options:
+  -v, --validators <count>        Number of validator nodes to generate.
+  -r, --rpc-nodes <count>         Number of RPC nodes to generate.
+  -a, --allocations <file>        Path to a genesis allocations JSON file.
+  -o, --outputType <type>         Output target (screen, file, kubernetes).
+                                  (default: "screen")
+  --consensus <algorithm>         Consensus algorithm (IBFTv2, QBFT).
+  --chain-id <number>             Chain ID for the genesis config.
+  --seconds-per-block <number>    Block time in seconds.
+  --gas-limit <decimal>           Block gas limit in decimal form.
+  --gas-price <number>            Base gas price (wei).
+  --evm-stack-size <number>       EVM stack size limit.
+  --contract-size-limit <number>  Contract size limit in bytes.
+  -h, --help                      display help for command
 ```
-
-This project was created using `bun init` in bun v1.2.22. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.

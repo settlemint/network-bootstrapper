@@ -1,28 +1,32 @@
 #!/usr/bin/env bun
 
-import { relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { Glob } from "bun";
 import { parse, stringify } from "yaml";
 
-interface VersionInfo {
+const RELEASE_TAG_PATTERN = /^v?[0-9]+\.[0-9]+\.[0-9]+$/;
+const LEADING_V_PATTERN = /^v/;
+const NON_ALPHANUMERIC_PATTERN = /[^0-9A-Za-z-]/g;
+
+type VersionInfo = {
   tag: "latest" | "main" | "pr";
   version: string;
-}
+};
 
-interface VersionParams {
+type VersionParams = {
   refSlug?: string;
   refName?: string;
   shaShort?: string;
   buildId?: string;
   startPath?: string;
-}
+};
 
-interface PackageJson {
+type PackageJson = {
   version: string;
   [key: string]: unknown;
-}
+};
 
-interface ChartYaml {
+type ChartYaml = {
   version: string;
   appVersion: string;
   dependencies?: Array<{
@@ -32,6 +36,29 @@ interface ChartYaml {
     [key: string]: unknown;
   }>;
   [key: string]: unknown;
+};
+
+async function findPackageJsonPath(startPath?: string): Promise<string> {
+  const resolvedPath = resolve(startPath ?? ".");
+  let currentDir = resolvedPath;
+  let parentDir = dirname(currentDir);
+
+  while (currentDir !== parentDir) {
+    const candidate = join(currentDir, "package.json");
+    if (await Bun.file(candidate).exists()) {
+      return candidate;
+    }
+
+    currentDir = parentDir;
+    parentDir = dirname(currentDir);
+  }
+
+  const rootCandidate = join(currentDir, "package.json");
+  if (await Bun.file(rootCandidate).exists()) {
+    return rootCandidate;
+  }
+
+  throw new Error(`package.json not found when searching from ${resolvedPath}`);
 }
 
 /**
@@ -40,16 +67,13 @@ interface ChartYaml {
  * @returns The parsed package.json content
  */
 async function readRootPackageJson(startPath?: string): Promise<PackageJson> {
-  const packageJsonFile = Bun.file("package.json");
-
-  if (!(await packageJsonFile.exists())) {
-    throw new Error("Package.json not found at package.json");
-  }
+  const packageJsonPath = await findPackageJsonPath(startPath);
+  const packageJsonFile = Bun.file(packageJsonPath);
 
   const packageJson = (await packageJsonFile.json()) as PackageJson;
 
   if (!packageJson.version) {
-    throw new Error("No version found in package.json");
+    throw new Error(`No version found in ${packageJsonPath}`);
   }
 
   return packageJson;
@@ -70,12 +94,9 @@ function generateVersionInfo(
   baseVersion: string,
   buildId?: string
 ): VersionInfo {
-  // Check if ref slug matches version pattern (v?[0-9]+\.[0-9]+\.[0-9]+$)
-  const versionPattern = /^v?[0-9]+\.[0-9]+\.[0-9]+$/;
-
-  if (versionPattern.test(refSlug)) {
+  if (RELEASE_TAG_PATTERN.test(refSlug)) {
     // Remove 'v' prefix if present
-    const version = refSlug.replace(/^v/, "");
+    const version = refSlug.replace(LEADING_V_PATTERN, "");
     return {
       tag: "latest",
       version,
@@ -85,7 +106,8 @@ function generateVersionInfo(
   if (refName === "main") {
     // Prefer numeric/strict BUILD_ID for better Renovate sorting
     // Fallback to short SHA, and finally a timestamp to ensure uniqueness
-    const sanitize = (s: string) => s.replace(/[^0-9A-Za-z-]/g, "");
+    const sanitize = (value: string) =>
+      value.replace(NON_ALPHANUMERIC_PATTERN, "");
     const id =
       sanitize(buildId || "") || sanitize(shaShort || "") || `${Date.now()}`;
     // Use SemVer pre-release with dot-separated identifiers: -main.<buildid>
@@ -97,7 +119,7 @@ function generateVersionInfo(
   }
 
   // Default case (PR or other branches)
-  const version = `${baseVersion}-pr${shaShort.replace(/^v/, "")}`;
+  const version = `${baseVersion}-pr${shaShort.replace(LEADING_V_PATTERN, "")}`;
   return {
     tag: "pr",
     version,
@@ -159,7 +181,9 @@ function updateWorkspaceDependencies(
   depType: string,
   newVersion: string
 ): number {
-  if (!deps) return 0;
+  if (!deps) {
+    return 0;
+  }
 
   let workspaceCount = 0;
   for (const [depName, depVersion] of Object.entries(deps)) {
@@ -191,7 +215,9 @@ function updateChartDependencies(
     | undefined,
   newVersion: string
 ): number {
-  if (!dependencies) return 0;
+  if (!dependencies) {
+    return 0;
+  }
 
   let dependencyCount = 0;
   for (const dep of dependencies) {
@@ -267,11 +293,11 @@ export async function updatePackageVersion(startPath?: string): Promise<void> {
         }
 
         const oldVersion = packageJson.version;
-        let hasChanges = false;
+        const versionChanged = oldVersion !== newVersion;
 
-        // Update the main version
-        packageJson.version = newVersion;
-        hasChanges = true;
+        if (versionChanged) {
+          packageJson.version = newVersion;
+        }
 
         // Update workspace dependencies in all dependency types
         const workspaceUpdates = [
@@ -302,14 +328,20 @@ export async function updatePackageVersion(startPath?: string): Promise<void> {
           0
         );
 
-        if (hasChanges) {
+        const shouldWrite = versionChanged || totalWorkspaceUpdates > 0;
+
+        if (shouldWrite) {
           // Write the updated package.json back to disk
           await Bun.write(
             packagePath,
-            JSON.stringify(packageJson, null, 2) + "\n"
+            `${JSON.stringify(packageJson, null, 2)}\n`
           );
 
-          console.log(`    Updated version: ${oldVersion} -> ${newVersion}`);
+          if (versionChanged) {
+            console.log(`    Updated version: ${oldVersion} -> ${newVersion}`);
+          } else {
+            console.log(`    Version already at ${newVersion}`);
+          }
           if (totalWorkspaceUpdates > 0) {
             console.log(
               `    Updated ${totalWorkspaceUpdates} total workspace:* references`
@@ -382,16 +414,18 @@ async function updateChartVersions(): Promise<void> {
 
         const oldVersion = chart.version;
         const oldAppVersion = chart.appVersion;
-        let hasChanges = false;
+        const versionChanged = Boolean(
+          chart.version && chart.version !== newVersion
+        );
+        const appVersionChanged = Boolean(
+          chart.appVersion && chart.appVersion !== newVersion
+        );
 
-        // Update the version fields
-        if (chart.version) {
+        if (versionChanged && chart.version) {
           chart.version = newVersion;
-          hasChanges = true;
         }
-        if (chart.appVersion) {
+        if (appVersionChanged && chart.appVersion) {
           chart.appVersion = newVersion;
-          hasChanges = true;
         }
 
         // Update chart dependencies with version "*"
@@ -400,17 +434,18 @@ async function updateChartVersions(): Promise<void> {
           newVersion
         );
 
-        if (dependencyUpdates > 0) {
-          hasChanges = true;
-        }
+        const hasChanges =
+          versionChanged || appVersionChanged || dependencyUpdates > 0;
 
         if (hasChanges) {
           // Convert back to YAML and write
           const updatedContent = stringify(chart);
           await Bun.write(chartPath, updatedContent);
 
-          console.log(`    Updated version: ${oldVersion} -> ${newVersion}`);
-          if (oldAppVersion !== oldVersion) {
+          if (oldVersion && oldVersion !== newVersion) {
+            console.log(`    Updated version: ${oldVersion} -> ${newVersion}`);
+          }
+          if (oldAppVersion && oldAppVersion !== newVersion) {
             console.log(
               `    Updated appVersion: ${oldAppVersion} -> ${newVersion}`
             );
