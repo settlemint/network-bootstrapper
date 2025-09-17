@@ -274,7 +274,7 @@ jobs:
         if: |
           github.event_name == 'push' &&
           startsWith(github.ref, 'refs/tags/')
-        uses: stefanprodan/helm-gh-pages@v1.7.0
+        uses: stefanprodan/helm-gh-pages@0ad2bb377311d61ac04ad9eb6f252fb68e207260 # v1.7.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           charts_dir: charts
