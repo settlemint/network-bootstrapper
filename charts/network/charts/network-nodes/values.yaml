@@ -334,7 +334,7 @@ livenessProbe:
   # HTTP GET probe configuration hitting the Besu liveness endpoint.
   httpGet:
     # -- (string) HTTP path used for liveness probing.
-    path: /liveness
+    path: /readiness?minPeers=1&maxBlocksBehind=100
     # -- (string|int) Target container port serving the liveness endpoint.
     port: json-rpc
   # -- (int) Seconds to wait before starting liveness checks.
@@ -357,7 +357,7 @@ readinessProbe:
   # -- (int) Seconds to wait before starting readiness checks.
   initialDelaySeconds: 15
   # -- (int) Frequency of readiness checks in seconds.
-  periodSeconds: 10
+  periodSeconds: 5
   # -- (int) Timeout in seconds before marking the probe as failed.
   timeoutSeconds: 2
   # -- (int) Consecutive failures required before the pod is considered unready.

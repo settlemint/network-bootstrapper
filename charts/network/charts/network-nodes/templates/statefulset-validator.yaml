@@ -35,6 +35,7 @@ spec:
   {{- $initContainers := .Values.initContainers | default (dict) }}
   {{- $sharedInitContainers := get $initContainers "shared" }}
   {{- $validatorInitContainers := get $initContainers "validator" }}
+  podManagementPolicy: Parallel
   replicas: {{ $validatorReplicaBudget }}
   serviceName: {{ include "nodes.fullname" . }}
   {{- if and $useClaimTemplate (or (ne $whenDeleted "") (ne $whenScaled "")) }}
