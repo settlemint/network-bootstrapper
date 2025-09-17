@@ -35,7 +35,12 @@ serviceAccount:
 
 # This is for setting Kubernetes Annotations to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-podAnnotations: {}
+# Defaults ensure Prometheus can scrape Besu's metrics endpoint without extra overrides.
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: /metrics
+  prometheus.io/port: "9545"
+  prometheus.io/scheme: http
 # This is for setting Kubernetes Labels to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 podLabels: {}
@@ -250,14 +255,23 @@ resources:
   #   memory: 128Mi
 
 # This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+# Besu publishes dedicated /liveness and /readiness endpoints on the JSON-RPC service port; probe timings cover startup warm-up.
 livenessProbe:
   httpGet:
-    path: /
-    port: http
+    path: /liveness
+    port: json-rpc
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
 readinessProbe:
   httpGet:
-    path: /
-    port: http
+    path: /readiness?minPeers=0&maxBlocksBehind=100
+    port: json-rpc
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
 
 # Persistent storage configuration for the StatefulSet more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
 persistence:

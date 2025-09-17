@@ -27,6 +27,7 @@ spec:
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
   {{- $rpcReplicaBudget := .Values.rpcReplicaCount | int }}
+  podManagementPolicy: Parallel
   replicas: {{ .Values.rpcReplicaCount }}
   serviceName: {{ include "nodes.fullname" . }}
   {{- if and $useClaimTemplate (or (ne $whenDeleted "") (ne $whenScaled "")) }}
@@ -69,6 +70,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -78,6 +83,7 @@ spec:
           command:
             - /bin/sh
             - -c
+          # Advertise the pod IP so peers see a reachable address.
           args:
             - |
               exec
@@ -85,7 +91,8 @@ spec:
                 --config-file=/etc/besu/config.toml \
                 --Xdns-enabled=true \
                 --Xdns-update-enabled=true \
-                --min-gas-price={{ .Values.config.minGasPrice }}
+                --min-gas-price={{ .Values.config.minGasPrice }} \
+                --p2p-host=${POD_IP}
           ports:
             - name: json-rpc
               containerPort: {{ .Values.service.ports.rpc }}
@@ -131,10 +138,6 @@ spec:
               mountPath: /etc/besu/static-nodes.json
               subPath: static-nodes.json
               readOnly: true
-            - name: besu-private-key
-              mountPath: {{ printf "/data/%s" $privateKeyFilename }}
-              subPathExpr: "$(POD_NAME)/privateKey"
-              readOnly: true
             {{- if $shouldMountPersistence }}
             - name: {{ $volumeName }}
               mountPath: /data
@@ -159,20 +162,6 @@ spec:
         - name: besu-static-nodes
           configMap:
             name: besu-static-nodes
-        - name: besu-private-key
-          projected:
-            {{- if gt $rpcReplicaBudget 0 }}
-            sources:
-              {{- range $i, $_ := until $rpcReplicaBudget }}
-              - secret:
-                  name: {{ printf "besu-node-rpc-node-%d-private-key" (add $i 1) }}
-                  items:
-                    - key: privateKey
-                      path: {{ printf "%s-rpc-%d/privateKey" (include "nodes.fullname" $root) $i }}
-              {{- end }}
-            {{- else }}
-            sources: []
-            {{- end }}
         {{- if $useExistingClaim }}
         - name: {{ $volumeName }}
           persistentVolumeClaim:
