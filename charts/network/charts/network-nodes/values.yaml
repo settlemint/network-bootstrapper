@@ -1,58 +1,60 @@
-# rpcReplicaCount sets the number of RPC StatefulSet replicas that serve JSON-RPC traffic.
+# Default configuration values for the network-nodes subchart. All keys include helm-docs compatible annotations.
+
+# -- (int) Number of RPC node replicas provisioned via StatefulSet.
 rpcReplicaCount: 2
 
-# validatorReplicaCount sets the number of validator StatefulSet replicas responsible for consensus.
+# -- (int) Number of validator node replicas participating in consensus.
 validatorReplicaCount: 4
 
-# image configures the Besu container image used for both RPC and validator pods.
+# Container image configuration shared by validator and RPC pods.
 image:
-  # image.repository points at the OCI registry location containing the Besu image.
+  # -- (string) OCI image repository hosting Hyperledger Besu.
   repository: docker.io/hyperledger/besu
-  # image.pullPolicy determines when Kubernetes attempts to re-pull the image layers.
+  # -- (string) Kubernetes image pull policy for Besu containers.
   pullPolicy: IfNotPresent
-  # image.tag pins the Besu version; update to consume a different upstream release.
+  # -- (string) Specific Besu image tag to deploy.
   tag: "25.8.0"
 
-# imagePullSecrets lists Docker registry credentials needed to pull the Besu image.
+# -- (list) Image pull secrets granting registry access for the Besu image.
 imagePullSecrets: []
 
-# nameOverride replaces the short chart name used in resource name templates.
+# -- (string) Override for the short chart name used in resource naming.
 nameOverride: ""
 
-# fullnameOverride replaces the fully qualified release name used for resource naming.
+# -- (string) Override for the fully qualified release name used in resource naming.
 fullnameOverride: "besu-node"
 
-# serviceAccount configures the Kubernetes ServiceAccount bound to pods created by this chart.
+# Kubernetes ServiceAccount configuration applied to Besu pods.
 serviceAccount:
-  # serviceAccount.create controls whether the chart should create a ServiceAccount automatically.
+  # -- (bool) Create a ServiceAccount resource automatically for the release.
   create: true
-  # serviceAccount.automount controls whether pods receive a projected ServiceAccount token.
+  # -- (bool) Mount the ServiceAccount token volume into pods.
   automount: true
-  # serviceAccount.annotations attaches metadata annotations to the ServiceAccount object.
+  # -- (object) Metadata annotations applied to the ServiceAccount.
   annotations: {}
-  # serviceAccount.name references an existing ServiceAccount when creation is disabled.
+  # -- (string) Existing ServiceAccount name to reuse when creation is disabled.
   name: ""
 
-# podAnnotations applies metadata annotations to every Besu pod (validators and RPC nodes).
+# Pod annotations merged onto all Besu pods.
 podAnnotations:
-  # podAnnotations.prometheus.io/scrape enables Prometheus autoscraping of Besu metrics.
+  # -- (string) Enables Prometheus scraping of the Besu metrics endpoint.
   prometheus.io/scrape: "true"
-  # podAnnotations.prometheus.io/path identifies the HTTP path exposing metrics.
+  # -- (string) HTTP path exposing Prometheus-formatted metrics.
   prometheus.io/path: /metrics
-  # podAnnotations.prometheus.io/port sets the metrics port label consumed by the scraper.
+  # -- (string) Container port value used by Prometheus to scrape metrics.
   prometheus.io/port: "9545"
-  # podAnnotations.prometheus.io/scheme selects the HTTP scheme used to scrape metrics.
+  # -- (string) HTTP scheme (http or https) used for metrics scraping.
   prometheus.io/scheme: http
 
-# podLabels applies extra Kubernetes labels to every Besu pod for selection or organisation.
+# Additional labels applied to all Besu pods.
 podLabels: {}
 
-# podSecurityContext defines pod-level Linux security settings shared by all containers in a pod.
+# Pod-level security context shared by all containers.
 podSecurityContext:
   {}
   # fsGroup: 2000
 
-# securityContext defines container-level security controls for the Besu process.
+# Container-level security context applied to Besu containers.
 securityContext:
   {}
   # capabilities:
@@ -62,89 +64,89 @@ securityContext:
   # runAsNonRoot: true
   # runAsUser: 1000
 
-# service defines the Kubernetes Service exposing Besu endpoints.
+# Kubernetes Service definition exposing Besu endpoints.
 service:
-  # service.type selects the Service controller type (ClusterIP, NodePort, LoadBalancer, etc.).
+  # -- (string) Service type controlling how endpoints are published (ClusterIP, NodePort, etc.).
   type: ClusterIP
-  # service.ports maps friendly names to Service ports for Besu endpoints.
+  # Named Service ports exposing Besu interfaces.
   ports:
-    # service.ports.rpc exposes the HTTP JSON-RPC interface.
+    # -- (int) HTTP JSON-RPC port.
     rpc: 8545
-    # service.ports.ws exposes the WebSocket JSON-RPC interface.
+    # -- (int) WebSocket JSON-RPC port.
     ws: 8546
-    # service.ports.graphql exposes the GraphQL API.
+    # -- (int) GraphQL API port.
     graphql: 8547
-    # service.ports.rlpx exposes the peer-to-peer RLPx TCP port.
+    # -- (int) RLPx TCP peer-to-peer port.
     rlpx: 30303
-    # service.ports.discovery exposes the peer discovery UDP port.
+    # -- (int) Discovery UDP port used by devp2p.
     discovery: 30303
-    # service.ports.metrics exposes the Prometheus metrics endpoint.
+    # -- (int) Prometheus metrics port.
     metrics: 9545
 
-# config captures the default besu.conf values applied to both validator and RPC nodes.
+# Core Besu configuration persisted as besu.conf for both validators and RPC nodes.
 config:
-  # config.logging controls the global logging verbosity for Besu.
+  # -- (string) Log verbosity level for Besu components.
   logging: INFO
-  # config.dataStorageFormat selects the ledger storage backend (FOREST or BONSAI).
+  # -- (string) Ledger storage backend (FOREST or BONSAI).
   dataStorageFormat: FOREST
-  # config.privateKeyFilename names the file containing the node's private key inside mounted secrets.
+  # -- (string) Filename containing each node's private key within mounted secrets.
   privateKeyFilename: privateKey
-  # config.bonsaiLimitTrieLogsEnabled toggles Bonsai limit trie logging for debugging state transitions.
+  # -- (bool) Emit Bonsai limit trie logs for debugging state transitions.
   bonsaiLimitTrieLogsEnabled: false
-  # config.cacheLastBlocks specifies how many recent blocks are cached for quick access.
+  # -- (int) Number of recent blocks cached in memory.
   cacheLastBlocks: 1024
-  # config.minGasPrice sets the minimum gas price accepted for transactions.
+  # -- (int) Minimum gas price accepted for transactions (wei).
   minGasPrice: 0
-  # config.txPool configures the transaction pool behaviour.
+  # Transaction pool configuration for ingress and prioritisation.
   txPool:
-    # config.txPool.type selects the transaction ordering algorithm (e.g., FIFO, SEQUENCED).
+    # -- (string) Transaction ordering strategy (e.g., SEQUENCED).
     type: SEQUENCED
-    # config.txPool.maxSize limits the total number of transactions kept in the pool.
+    # -- (int) Maximum transactions retained in the pool.
     maxSize: 100000
-    # config.txPool.noLocalPriority disables automatic prioritisation of locally submitted transactions.
+    # -- (bool) Disable preferential treatment of locally submitted transactions.
     noLocalPriority: true
-    # config.txPool.limitByAccountPercentage caps per-account transaction contribution.
+    # -- (int) Maximum percentage of the pool allowed per account.
     limitByAccountPercentage: 1
-    # config.txPool.enableSaveRestore enables persistence of the transaction pool across restarts.
+    # -- (bool) Persist the transaction pool to disk between restarts.
     enableSaveRestore: true
-  # config.p2p configures peer-to-peer networking parameters.
+  # Peer-to-peer networking settings.
   p2p:
-    # config.p2p.enabled toggles the Besu peer-to-peer subsystem.
+    # -- (bool) Enable the devp2p networking subsystem.
     enabled: true
-    # config.p2p.discoveryEnabled controls participation in peer discovery.
+    # -- (bool) Enable the discovery protocol for automatic peer finding.
     discoveryEnabled: true
-    # config.p2p.staticNodesFile points to the static nodes JSON file mounted from ConfigMaps.
+    # -- (string) Path to the static-nodes.json file providing fixed peers.
     staticNodesFile: "/etc/besu/static-nodes.json"
-    # config.p2p.interface binds the network interface for P2P sockets.
+    # -- (string) Network interface the P2P server binds to.
     interface: "0.0.0.0"
-    # config.p2p.maxPeers caps the number of simultaneous peer connections.
+    # -- (int) Maximum simultaneous peer connections.
     maxPeers: 25
-  # config.rpc holds RPC subsystem configuration shared by HTTP and WebSocket servers.
+  # JSON-RPC subsystem configuration shared by HTTP and WebSocket servers.
   rpc:
-    # config.rpc.txFeecap limits the fee per gas for RPC-submitted transactions (0 disables the cap).
+    # -- (int) Maximum fee per gas accepted for transactions submitted via RPC (0 disables the cap).
     txFeecap: 0
-  # config.sync configures chain synchronisation behaviour.
+  # Chain synchronisation controls.
   sync:
-    # config.sync.minPeers defines the minimum peers required before commencing sync.
+    # -- (int) Minimum number of peers required before synchronisation starts.
     minPeers: 1
-    # config.sync.mode selects the synchronisation mode (e.g., FULL, FAST, SNAP).
+    # -- (string) Synchronisation mode (FULL, FAST, SNAP, etc.).
     mode: FULL
-  # config.remoteConnectionsLimitEnabled toggles limiting simultaneous remote JSON-RPC connections.
+  # -- (bool) Enable limits on concurrent remote JSON-RPC connections.
   remoteConnectionsLimitEnabled: false
-  # config.randomPeerPriorityEnabled shuffles peer priority to avoid fixed ordering bias.
+  # -- (bool) Randomise peer priority to avoid deterministic ordering.
   randomPeerPriorityEnabled: true
-  # config.receiptCompactionEnabled compacts receipt storage to save disk space.
+  # -- (bool) Enable receipt compaction to reduce disk usage.
   receiptCompactionEnabled: true
-  # config.hostAllowlist enumerates hosts authorised to reach the HTTP/WS RPC endpoints.
+  # -- (list) Hostnames allowed to access the RPC interfaces; `*` permits all.
   hostAllowlist:
     - "*"
-  # config.http configures the HTTP JSON-RPC server.
+  # HTTP JSON-RPC server configuration.
   http:
-    # config.http.enabled toggles the HTTP JSON-RPC listener.
+    # -- (bool) Enable the HTTP JSON-RPC listener.
     enabled: true
-    # config.http.host binds the HTTP JSON-RPC listener interface.
+    # -- (string) Network interface for the HTTP JSON-RPC listener.
     host: "0.0.0.0"
-    # config.http.api lists the JSON-RPC API namespaces enabled over HTTP.
+    # -- (list) Enabled JSON-RPC API namespaces exposed over HTTP.
     api:
       - DEBUG
       - ETH
@@ -157,24 +159,24 @@ config:
       - PERM
       - TXPOOL
       - PLUGINS
-    # config.http.corsOrigins enumerates allowed CORS origins for HTTP requests.
+    # -- (list) Allowed CORS origins for HTTP JSON-RPC requests.
     corsOrigins:
       - all
-    # config.http.authenticationEnabled toggles JWT authentication for HTTP requests.
+    # -- (bool) Enable JWT authentication for HTTP JSON-RPC requests.
     authenticationEnabled: false
-    # config.http.maxActiveConnections limits concurrent HTTP connections.
+    # -- (int) Maximum concurrent HTTP JSON-RPC connections.
     maxActiveConnections: 2000
-    # config.http.maxRequestContentLength caps the HTTP body size in bytes.
+    # -- (int) Maximum HTTP request body size in bytes.
     maxRequestContentLength: 524288000
-    # config.http.maxBatchSize limits the number of JSON-RPC requests permitted in a single batch.
+    # -- (int) Maximum number of batched JSON-RPC calls per request.
     maxBatchSize: 512
-  # config.ws configures the WebSocket JSON-RPC server.
+  # WebSocket JSON-RPC server configuration.
   ws:
-    # config.ws.enabled toggles the WebSocket JSON-RPC listener.
+    # -- (bool) Enable the WebSocket JSON-RPC listener.
     enabled: true
-    # config.ws.host binds the WebSocket listener interface.
+    # -- (string) Network interface for the WebSocket listener.
     host: "0.0.0.0"
-    # config.ws.api lists the JSON-RPC API namespaces enabled over WebSockets.
+    # -- (list) Enabled JSON-RPC API namespaces exposed over WebSockets.
     api:
       - DEBUG
       - ETH
@@ -187,28 +189,28 @@ config:
       - PERM
       - TXPOOL
       - PLUGINS
-    # config.ws.authenticationEnabled toggles JWT authentication for WebSocket requests.
+    # -- (bool) Enable JWT authentication for WebSocket requests.
     authenticationEnabled: false
-    # config.ws.maxActiveConnections limits concurrent WebSocket connections.
+    # -- (int) Maximum concurrent WebSocket connections.
     maxActiveConnections: 2000
-    # config.ws.maxFrameSize caps the maximum WebSocket frame size in bytes.
+    # -- (int) Maximum WebSocket frame size in bytes.
     maxFrameSize: 2097152
-  # config.graphql configures the optional GraphQL endpoint.
+  # GraphQL server configuration.
   graphql:
-    # config.graphql.enabled toggles the GraphQL server.
+    # -- (bool) Enable the GraphQL API server.
     enabled: true
-    # config.graphql.host binds the GraphQL server interface.
+    # -- (string) Network interface for the GraphQL server.
     host: "0.0.0.0"
-    # config.graphql.corsOrigins lists allowed origins for GraphQL requests.
+    # -- (list) Allowed CORS origins for GraphQL requests.
     corsOrigins:
       - all
-  # config.metrics configures the Prometheus metrics subsystem.
+  # Prometheus metrics export configuration.
   metrics:
-    # config.metrics.enabled toggles the Prometheus metrics exporter.
+    # -- (bool) Enable the Prometheus metrics endpoint.
     enabled: true
-    # config.metrics.host binds the metrics endpoint interface.
+    # -- (string) Network interface for the metrics endpoint.
     host: "0.0.0.0"
-    # config.metrics.categories lists the metrics categories exposed.
+    # -- (list) Metrics categories exposed to Prometheus.
     categories:
       - BLOCKCHAIN
       - ETHEREUM
@@ -221,95 +223,101 @@ config:
       - RPC
       - SYNCHRONIZER
       - TRANSACTION_POOL
-  # config.revertReasonEnabled toggles inclusion of revert reasons in RPC responses.
+  # -- (bool) Include revert reasons in RPC responses when failures occur.
   revertReasonEnabled: true
 
-# ingress configures Kubernetes Ingress resources for publicly exposing RPC services.
+# Ingress configuration used to expose RPC services via Kubernetes Ingress resources.
 ingress:
-  # ingress.enabled toggles creation of an Ingress resource.
+  # -- (bool) Enable creation of an Ingress resource.
   enabled: false
-  # ingress.className sets the ingressClassName field for controller selection.
+  # -- (string) ingressClassName assigned to the Ingress for controller selection.
   className: ""
-  # ingress.annotations attaches metadata annotations for ingress controllers.
+  # Metadata annotations applied to the Ingress resource.
   annotations:
     {}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
-  # ingress.hosts lists host/path routing rules for the Ingress.
+  # -- (list) Hostname and path routing rules for the Ingress.
   hosts:
     - host: chart-example.local
       paths:
         - path: /
           pathType: ImplementationSpecific
-  # ingress.tls defines TLS secrets and hostnames for HTTPS termination.
+  # -- (list) TLS configuration for Ingress hosts.
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:
   #      - chart-example.local
 
-# httpRoute configures Gateway API HTTPRoute resources used with Gateway controllers.
+# Gateway API HTTPRoute configuration for clusters with gateway-api controllers.
 httpRoute:
-  # httpRoute.enabled toggles rendering of an HTTPRoute resource.
+  # -- (bool) Enable rendering of an HTTPRoute resource.
   enabled: false
-  # httpRoute.annotations applies annotations to the HTTPRoute manifest.
+  # Metadata annotations applied to the HTTPRoute.
   annotations: {}
-  # httpRoute.parentRefs lists Gateway references that should attach this route.
+  # -- (list) Gateway references that should accept this route.
   parentRefs:
     - name: gateway
       sectionName: http
       # namespace: default
-  # httpRoute.hostnames enumerates HTTP hostnames matched by the route.
+  # -- (list) HTTP hostnames matched by the route.
   hostnames:
     - chart-example.local
-  # httpRoute.rules defines match and filter blocks evaluated by the Gateway.
+  # -- (list) Rules containing matches and optional filters evaluated by the Gateway.
   rules:
-    - matches:
-        - path:
+    -
+      # -- (list) Match conditions evaluated for each request.
+      matches:
+        -
+          # Path matching condition for the request.
+          path:
+            # -- (string) Path match type (Exact, PathPrefix, or RegularExpression).
             type: PathPrefix
+            # -- (string) Path value used when evaluating the request URL.
             value: /headers
-    # filters can be enabled to mutate headers or traffic characteristics.
-    # - type: RequestHeaderModifier
-    #   requestHeaderModifier:
-    #     set:
-    #       - name: My-Overwrite-Header
-    #         value: this-is-the-only-value
-    #     remove:
-    #       - User-Agent
-    # Additional matches can be added as needed.
-    # - matches:
-    #     - path:
-    #         type: PathPrefix
-    #         value: /echo
-    #       headers:
-    #         - name: version
-    #           value: v2
+      # filters can be enabled to mutate headers or other request properties.
+      # - type: RequestHeaderModifier
+      #   requestHeaderModifier:
+      #     set:
+      #       - name: My-Overwrite-Header
+      #         value: this-is-the-only-value
+      #     remove:
+      #       - User-Agent
+      # Additional matches can be added as required by traffic patterns.
+      # - matches:
+      #     - path:
+      #         type: PathPrefix
+      #         value: /echo
+      #       headers:
+      #         - name: version
+      #           value: v2
 
-# openShiftRoute configures an OpenShift Route for clusters running the OpenShift router.
+# OpenShift Route configuration for exposing services through the OpenShift router.
 openShiftRoute:
-  # openShiftRoute.enabled toggles creation of the Route resource.
+  # -- (bool) Enable creation of an OpenShift Route resource.
   enabled: false
-  # openShiftRoute.annotations attaches metadata annotations for the Route.
+  # Metadata annotations applied to the Route.
   annotations: {}
-  # openShiftRoute.host enforces a specific hostname; leave empty for automatic allocation.
+  # -- (string) Desired external hostname for the Route; leave empty for automatic assignment.
   host: ""
-  # openShiftRoute.path constrains routing to a specific URL path.
+  # -- (string) URL path prefix handled by the Route.
   path: ""
-  # openShiftRoute.wildcardPolicy configures wildcard host handling (None or Subdomain).
+  # -- (string) Wildcard policy controlling subdomain routing (None or Subdomain).
   wildcardPolicy: ""
-  # openShiftRoute.port configures the target service port used by the Route.
+  # Target service port configuration for the Route.
   port:
-    # openShiftRoute.port.targetPort references the named service port exposed via the Route.
+    # -- (string) Named service port exposed through the Route.
     targetPort: http
-  # openShiftRoute.to configures backend weighting for load balancing.
+  # Primary backend configuration for the Route.
   to:
-    # openShiftRoute.to.weight adjusts traffic weighting across multiple service backends.
+    # -- (int) Backend weight determining traffic distribution.
     weight: 100
-  # openShiftRoute.alternateBackends adds additional backend targets following RouteTargetReference schema.
+  # -- (list) Additional backend references to balance traffic across services.
   alternateBackends: []
-  # openShiftRoute.tls defines TLS termination settings or disables TLS when set to null.
+  # -- (object|null) TLS termination settings; set to null to disable TLS.
   tls: null
 
-# resources defines CPU and memory requests/limits for Besu containers.
+# CPU and memory requests or limits for Besu containers.
 resources:
   {}
   # limits:
@@ -319,90 +327,92 @@ resources:
   #   cpu: 100m
   #   memory: 128Mi
 
-# livenessProbe configures the HTTP probe used to determine if the container should be restarted.
+# Liveness probe configuration ensuring containers restart when unhealthy.
 livenessProbe:
-  # livenessProbe.httpGet.path hits the Besu liveness endpoint.
+  # HTTP GET probe configuration hitting the Besu liveness endpoint.
   httpGet:
+    # -- (string) HTTP path used for liveness probing.
     path: /liveness
-    # livenessProbe.httpGet.port references the named container port serving HTTP JSON-RPC.
+    # -- (string|int) Target container port serving the liveness endpoint.
     port: json-rpc
-  # livenessProbe.initialDelaySeconds waits before starting liveness checks.
+  # -- (int) Seconds to wait before starting liveness checks.
   initialDelaySeconds: 30
-  # livenessProbe.periodSeconds schedules how frequently the probe runs.
+  # -- (int) Frequency of liveness checks in seconds.
   periodSeconds: 10
-  # livenessProbe.timeoutSeconds caps how long the probe waits for a response.
+  # -- (int) Timeout in seconds before marking the probe as failed.
   timeoutSeconds: 2
-  # livenessProbe.failureThreshold restarts the pod after this many consecutive failures.
+  # -- (int) Consecutive failures required before the container is restarted.
   failureThreshold: 3
 
-# readinessProbe configures the HTTP probe used to advertise readiness to receive traffic.
+# Readiness probe configuration signalling when pods can accept traffic.
 readinessProbe:
-  # readinessProbe.httpGet.path hits the readiness endpoint with peer and sync thresholds.
+  # HTTP GET probe configuration hitting the Besu readiness endpoint.
   httpGet:
+    # -- (string) HTTP path used for readiness probing, including peer/sync thresholds.
     path: /readiness?minPeers=0&maxBlocksBehind=100
-    # readinessProbe.httpGet.port references the named container port serving HTTP JSON-RPC.
+    # -- (string|int) Target container port serving the readiness endpoint.
     port: json-rpc
-  # readinessProbe.initialDelaySeconds waits before starting readiness checks.
+  # -- (int) Seconds to wait before starting readiness checks.
   initialDelaySeconds: 15
-  # readinessProbe.periodSeconds schedules how frequently the readiness probe runs.
+  # -- (int) Frequency of readiness checks in seconds.
   periodSeconds: 10
-  # readinessProbe.timeoutSeconds caps the probe response time.
+  # -- (int) Timeout in seconds before marking the probe as failed.
   timeoutSeconds: 2
-  # readinessProbe.failureThreshold marks the pod unready after this many consecutive failures.
+  # -- (int) Consecutive failures required before the pod is considered unready.
   failureThreshold: 3
 
-# persistence configures persistent storage for validator and RPC nodes.
+# Persistent storage configuration for both validator and RPC StatefulSets.
 persistence:
-  # persistence.enabled toggles persistent volume usage for ledger data.
+  # -- (bool) Enable persistent volume claims for ledger data.
   enabled: false
-  # persistence.mountPath is the container directory where the volume is mounted.
+  # -- (string) Container path where the persistent volume is mounted.
   mountPath: /data
-  # persistence.volumeName names the volume when using volumeClaimTemplates.
+  # -- (string) Logical name for the volume when using volumeClaimTemplates.
   volumeName: data
-  # persistence.accessModes declares the desired access modes for the PVC.
+  # -- (list) Requested access modes for the PersistentVolumeClaim.
   accessModes:
     - ReadWriteOnce
-  # persistence.size defines the requested storage capacity when provisioning PVCs.
+  # -- (string) Requested storage capacity for each PersistentVolumeClaim.
   size: 20Gi
-  # persistence.storageClass selects the Kubernetes StorageClass; leave empty for default.
+  # -- (string) StorageClass name used for provisioning volumes; empty selects the cluster default.
   storageClass: ""
-  # persistence.volumeMode switches between Filesystem and Block volume modes.
+  # -- (string) Volume mode (Filesystem or Block) requested for the PVC.
   volumeMode: ""
-  # persistence.existingClaim references a pre-created PersistentVolumeClaim to reuse.
+  # -- (string) Name of an existing PersistentVolumeClaim to reuse instead of creating new PVCs.
   existingClaim: ""
-  # persistence.annotations attaches metadata annotations to created PVCs.
+  # Metadata annotations applied to generated PVCs.
   annotations: {}
-  # persistence.selector filters PersistentVolumes when binding static PVs.
+  # PVC selector allowing binding to specific PersistentVolumes.
   selector: {}
-  # persistence.retention configures how PVCs are handled during deletion or scale-down.
+  # Retention policy controlling PVC lifecycle on delete or scale operations.
   retention:
-    # persistence.retention.whenDeleted dictates PVC behaviour when the Helm release is deleted.
+    # -- (string) Behaviour of PVCs when the Helm release is deleted.
     whenDeleted: Retain
-    # persistence.retention.whenScaled dictates PVC behaviour when replicas are scaled down.
+    # -- (string) Behaviour of PVCs when the StatefulSet scales down.
     whenScaled: Delete
-  # persistence.subPath mounts a subdirectory of the volume instead of the root.
+  # -- (string) Subdirectory of the volume to mount instead of the root.
   subPath: ""
-  # persistence.readOnly mounts the volume read-only when true.
+  # -- (bool) Mount the volume read-only when true.
   readOnly: false
 
-# volumes lists extra volumes attached to each Besu pod for custom configuration or secrets.
+# -- (list) Extra volumes attached to Besu pods for custom configuration or secrets.
 volumes: []
 # - name: foo
 #   secret:
 #     secretName: mysecret
 #     optional: false
 
-# volumeMounts lists additional container volume mounts beyond the defaults.
+# -- (list) Additional volume mounts applied to Besu containers.
 volumeMounts: []
 # - name: foo
 #   mountPath: "/etc/foo"
 #   readOnly: true
 
-# nodeSelector constrains pod scheduling to nodes with matching labels.
+# Node selector constraints influencing where Besu pods can schedule.
 nodeSelector: {}
 
-# tolerations allows pods to schedule onto nodes with corresponding taints.
+# -- (list) Tolerations allowing pods to run on nodes with matching taints.
 tolerations: []
 
-# affinity defines node and pod affinity/anti-affinity rules for advanced scheduling.
+# Node and pod affinity or anti-affinity rules affecting scheduling decisions.
 affinity: {}
