@@ -69,11 +69,11 @@ Accepts either a YAML string or a list of init container maps and indents output
 {{- $ctx := .context -}}
 {{- $containers := .containers -}}
 {{- $indent := .indent | default 2 -}}
-{{- if $containers }}
-  {{- if kindIs "string" $containers -}}
+{{- if $containers -}}
+{{- if kindIs "string" $containers -}}
 {{ tpl $containers $ctx | nindent $indent }}
-  {{- else -}}
+{{- else -}}
 {{ tpl (toYaml $containers) $ctx | nindent $indent }}
-  {{- end -}}
 {{- end -}}
-{{- end }}
+{{- end -}}
+{{- end -}}

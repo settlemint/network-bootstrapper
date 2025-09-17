@@ -31,11 +31,7 @@ spec:
       {{- end }}
       {{- with .Values.initContainers }}
       initContainers:
-{{- if kindIs "string" . -}}
-{{ tpl . $ | nindent 8 }}
-{{- else -}}
-{{ tpl (toYaml .) $ | nindent 8 }}
-{{- end }}
+{{- include "network-bootstrapper.renderInitContainers" (dict "context" $ "containers" . "indent" 8) }}
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
