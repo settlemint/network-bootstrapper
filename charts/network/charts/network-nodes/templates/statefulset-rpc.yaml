@@ -24,7 +24,8 @@ spec:
   {{- $whenScaled := default "" (get $retention "whenScaled") }}
   {{- $useExistingClaim := and $persistenceEnabled (ne $existingClaim "") }}
   {{- $useClaimTemplate := and $persistenceEnabled (not $useExistingClaim) }}
-  {{- $shouldMountPersistence := and $persistenceEnabled (ne $mountPath "") }}
+  {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
+  {{- $shouldMountPersistence := $persistenceEnabled }}
   {{- $rpcReplicaBudget := .Values.rpcReplicaCount | int }}
   replicas: {{ .Values.rpcReplicaCount }}
   serviceName: {{ include "nodes.fullname" . }}
@@ -87,28 +88,22 @@ spec:
                 --min-gas-price={{ .Values.config.minGasPrice }}
           ports:
             - name: json-rpc
-              port: {{ .Values.service.ports.rpc }}
-              targetPort: json-rpc
+              containerPort: {{ .Values.service.ports.rpc }}
               protocol: TCP
             - name: ws
-              port: {{ .Values.service.ports.ws }}
-              targetPort: ws
+              containerPort: {{ .Values.service.ports.ws }}
               protocol: TCP
             - name: graphql
-              port: {{ .Values.service.ports.graphql }}
-              targetPort: graphql
+              containerPort: {{ .Values.service.ports.graphql }}
               protocol: TCP
             - name: rlpx
-              port: {{ .Values.service.ports.rlpx }}
-              targetPort: rlpx
+              containerPort: {{ .Values.service.ports.rlpx }}
               protocol: TCP
             - name: discovery
-              port: {{ .Values.service.ports.discovery }}
-              targetPort: discovery
+              containerPort: {{ .Values.service.ports.discovery }}
               protocol: UDP
             - name: metrics
-              port: {{ .Values.service.ports.metrics }}
-              targetPort: metrics
+              containerPort: {{ .Values.service.ports.metrics }}
               protocol: TCP
           {{- with .Values.livenessProbe }}
           livenessProbe:
@@ -133,12 +128,12 @@ spec:
               subPath: genesis.json
               readOnly: true
             - name: besu-private-key
-              mountPath: /etc/besu/privatekey
+              mountPath: {{ printf "/data/%s" $privateKeyFilename }}
               subPathExpr: "$(POD_NAME)/privateKey"
               readOnly: true
             {{- if $shouldMountPersistence }}
             - name: {{ $volumeName }}
-              mountPath: {{ $mountPath }}
+              mountPath: /data
               {{- if $subPath }}
               subPath: {{ $subPath }}
               {{- end }}

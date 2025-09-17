@@ -28,6 +28,9 @@ type CliOptions = {
   validators?: number;
   outputType?: OutputType;
   secondsPerBlock?: number;
+  staticNodeDomain?: string;
+  staticNodePort?: number;
+  staticNodeDiscoveryPort?: number;
 };
 
 type BootstrapDependencies = {
@@ -40,7 +43,9 @@ type BootstrapDependencies = {
 };
 
 const DEFAULT_VALIDATOR_COUNT = 4;
+const DEFAULT_STATIC_NODE_PORT = 30_303;
 const OUTPUT_CHOICES: OutputType[] = ["screen", "file", "kubernetes"];
+const LEADING_DOT_REGEX = /^\./u;
 
 // Normalizes CLI inputs wrapped by orchestrators that keep literal quotes.
 const stripSurroundingQuotes = (value: string): string => {
@@ -94,6 +99,41 @@ const generateGroup = (factory: NodeKeyFactory, count: number): IndexedNode[] =>
     ...factory.generate(),
   }));
 
+const normalizeStaticNodeDomain = (
+  domain: string | undefined
+): string | undefined => {
+  if (!domain) {
+    return;
+  }
+
+  const trimmed = domain.trim().replace(LEADING_DOT_REGEX, "");
+  return trimmed.length === 0 ? undefined : trimmed;
+};
+
+const createStaticNodeEntries = (
+  nodes: readonly IndexedNode[],
+  {
+    domain,
+    port,
+    discoveryPort,
+  }: { domain?: string; port: number; discoveryPort: number }
+): string[] => {
+  const normalizedDomain = normalizeStaticNodeDomain(domain);
+
+  return nodes.map((node) => {
+    const podName = `besu-node-validator-${node.index}-0`;
+    const serviceName = `besu-node-validator-${node.index}`;
+    const host = normalizedDomain
+      ? `${podName}.${serviceName}.${normalizedDomain}`
+      : podName;
+    const publicKey = node.publicKey.startsWith("0x")
+      ? node.publicKey.slice(2)
+      : node.publicKey;
+
+    return `enode://${publicKey}@${host}:${port}?discport=${discoveryPort}`;
+  });
+};
+
 const runBootstrap = async (
   options: CliOptions,
   deps: BootstrapDependencies
@@ -110,6 +150,9 @@ const runBootstrap = async (
     outputType,
     secondsPerBlock,
     validators: validatorOption,
+    staticNodeDomain: staticNodeDomainOption,
+    staticNodePort: staticNodePortOption,
+    staticNodeDiscoveryPort: staticNodeDiscoveryPortOption,
   } = options;
 
   const resolveCount = (
@@ -134,6 +177,11 @@ const runBootstrap = async (
 
   const validators = generateGroup(deps.factory, validatorsCount);
   const faucet = deps.factory.generate();
+  const staticNodes = createStaticNodeEntries(validators, {
+    domain: staticNodeDomainOption,
+    port: staticNodePortOption ?? DEFAULT_STATIC_NODE_PORT,
+    discoveryPort: staticNodeDiscoveryPortOption ?? DEFAULT_STATIC_NODE_PORT,
+  });
 
   const validatorAddresses = validators.map<HexAddress>((node) => node.address);
 
@@ -163,6 +211,7 @@ const runBootstrap = async (
     faucet,
     genesis,
     validators,
+    staticNodes,
   };
 
   await deps.outputResult(outputType ?? "screen", payload);
@@ -219,6 +268,24 @@ const createCliCommand = (
         );
       },
       "screen"
+    )
+    .option(
+      "--static-node-domain <domain>",
+      "DNS suffix appended to validator peer hostnames for static-nodes entries.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
+      "--static-node-port <number>",
+      "P2P port used for static-nodes enode URIs.",
+      (value: string) => parsePositiveInteger(value, "Static node port"),
+      DEFAULT_STATIC_NODE_PORT
+    )
+    .option(
+      "--static-node-discovery-port <number>",
+      "Discovery port used for static-nodes enode URIs.",
+      (value: string) =>
+        parseNonNegativeInteger(value, "Static node discovery port"),
+      DEFAULT_STATIC_NODE_PORT
     )
     .option(
       "--consensus <algorithm>",
@@ -281,6 +348,18 @@ const createCliCommand = (
           cmd.getOptionValueSource("validators") === "default"
             ? undefined
             : options.validators,
+        staticNodeDomain:
+          cmd.getOptionValueSource("staticNodeDomain") === "default"
+            ? undefined
+            : options.staticNodeDomain,
+        staticNodePort:
+          cmd.getOptionValueSource("staticNodePort") === "default"
+            ? undefined
+            : options.staticNodePort,
+        staticNodeDiscoveryPort:
+          cmd.getOptionValueSource("staticNodeDiscoveryPort") === "default"
+            ? undefined
+            : options.staticNodeDiscoveryPort,
       };
 
       const sanitizedOptions: CliOptions = {
@@ -289,6 +368,9 @@ const createCliCommand = (
           normalizedOptions.allocations === undefined
             ? undefined
             : stripSurroundingQuotes(normalizedOptions.allocations),
+        staticNodeDomain: normalizeStaticNodeDomain(
+          normalizedOptions.staticNodeDomain
+        ),
       };
 
       await runBootstrap(sanitizedOptions, deps);

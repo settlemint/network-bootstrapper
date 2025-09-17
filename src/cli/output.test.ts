@@ -76,13 +76,14 @@ const PUBLIC_KEY_HEX_LENGTH = 128;
 const HEX_RADIX = 16;
 const SAMPLE_VALIDATOR_INDEX = 1;
 const SAMPLE_FAUCET_INDEX = 99;
-const EXPECTED_CONFIGMAP_COUNT = 6;
+const EXPECTED_CONFIGMAP_COUNT = 7;
 const EXPECTED_SECRET_COUNT = 2;
 const HEX_PREFIX_PATTERN = /^0x/;
 const TEST_CHAIN_ID = 1;
 const HTTP_CONFLICT_STATUS = 409;
 const HTTP_INTERNAL_ERROR_STATUS = 500;
 const HTTP_SERVICE_UNAVAILABLE_STATUS = 503;
+const LEADING_DOT_REGEX = /^\./u;
 
 const sampleNode = (index: number): IndexedNode => {
   const hexValue = index.toString(HEX_RADIX);
@@ -99,10 +100,35 @@ const sampleNode = (index: number): IndexedNode => {
   };
 };
 
+const staticNodeUri = (
+  node: IndexedNode,
+  domain?: string,
+  port = 30_303,
+  discoveryPort = 30_303
+): string => {
+  const trimmedDomain =
+    domain === undefined || domain.trim().length === 0
+      ? undefined
+      : domain.trim().replace(LEADING_DOT_REGEX, "");
+  const podName = `besu-node-validator-${node.index}-0`;
+  const serviceName = `besu-node-validator-${node.index}`;
+  const host = trimmedDomain
+    ? `${podName}.${serviceName}.${trimmedDomain}`
+    : podName;
+  const publicKey = node.publicKey.startsWith("0x")
+    ? node.publicKey.slice(2)
+    : node.publicKey;
+  return `enode://${publicKey}@${host}:${port}?discport=${discoveryPort}`;
+};
+
+const sampleValidator = sampleNode(SAMPLE_VALIDATOR_INDEX);
+const sampleFaucet = sampleNode(SAMPLE_FAUCET_INDEX);
+
 const samplePayload: OutputPayload = {
-  faucet: sampleNode(SAMPLE_FAUCET_INDEX),
+  faucet: sampleFaucet,
   genesis: { config: { chainId: TEST_CHAIN_ID }, extraData: "0xabc" },
-  validators: [sampleNode(SAMPLE_VALIDATOR_INDEX)],
+  validators: [sampleValidator],
+  staticNodes: [staticNodeUri(sampleValidator)],
 };
 
 describe("outputResult", () => {
@@ -111,6 +137,7 @@ describe("outputResult", () => {
     await outputResult("screen", samplePayload);
     expect(output).toContain("Genesis");
     expect(output).toContain("Validator Nodes");
+    expect(output).toContain("Static Nodes");
   });
 
   test("file output writes json artifacts", async () => {
@@ -137,6 +164,7 @@ describe("outputResult", () => {
         "besu-node-validator-1-private-key",
         "besu-node-validator-1-pubkey",
         "genesis",
+        "static-nodes.json",
       ].sort()
     );
 
@@ -145,6 +173,12 @@ describe("outputResult", () => {
       "utf8"
     );
     expect(genesisContent).toContain(`"chainId": ${TEST_CHAIN_ID}`);
+
+    const staticNodesContent = await readFile(
+      join(targetDirPath, "static-nodes.json"),
+      "utf8"
+    );
+    expect(JSON.parse(staticNodesContent)).toEqual(samplePayload.staticNodes);
 
     await rm("out", { recursive: true, force: true });
   });
@@ -231,6 +265,7 @@ describe("outputResult", () => {
       expect(mapNames).toContain("besu-genesis");
       expect(mapNames).toContain("besu-faucet-address");
       expect(mapNames).toContain("besu-faucet-pubkey");
+      expect(mapNames).toContain("besu-static-nodes");
       expect(mapNames).not.toContain("besu-faucet-enode");
       const secretNames = createdSecrets.map((entry) => entry.name).sort();
       expect(secretNames).toEqual([
@@ -241,6 +276,13 @@ describe("outputResult", () => {
         entry.name.endsWith("validator-1-private-key")
       );
       expect(privateKeySecret?.data?.privateKey).toMatch(HEX_PREFIX_PATTERN);
+      const staticNodesConfig = createdConfigMaps.find(
+        (entry) => entry.name === "besu-static-nodes"
+      );
+      expect(staticNodesConfig?.data?.["static-nodes.json"]).toBeDefined();
+      expect(
+        JSON.parse(staticNodesConfig?.data?.["static-nodes.json"] ?? "[]")
+      ).toEqual(samplePayload.staticNodes);
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
       (KubeConfig.prototype as any).makeApiClient = originalMake;

@@ -91,6 +91,12 @@ affinity: {}
 settings:
   # -- (int) Number of validator node definitions the bootstrapper generates. Default: 4.
   validators:
+  # -- (string) DNS suffix appended to static node hostnames (for example: "namespace.svc.cluster.local"). Default: null.
+  staticNodeDomain:
+  # -- (int) P2P port used in static node enode URIs. Default: 30303.
+  staticNodePort: 30303
+  # -- (int) Discovery port used in static node enode URIs. Default: 30303.
+  staticNodeDiscoveryPort: 30303
   # -- (string) Filesystem path, accessible to the job, pointing to a JSON file with initial account allocations. Omit to skip pre-funded accounts.
   allocations:
   # -- (string) Destination for generated artefacts: `screen` (stdout), `file` (write to volume), or `kubernetes` (persist as Kubernetes secrets/configmaps). Default: "screen".

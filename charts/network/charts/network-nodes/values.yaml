@@ -70,7 +70,7 @@ service:
 config:
   logging: INFO
   dataStorageFormat: FOREST
-  dataPath: /var/lib/besu
+  privateKeyFilename: privateKey
   bonsaiLimitTrieLogsEnabled: false
   cacheLastBlocks: 1024
   minGasPrice: 0
@@ -263,7 +263,7 @@ readinessProbe:
 persistence:
   enabled: false
   # When enabled without an existingClaim, a PersistentVolumeClaim is created per replica.
-  mountPath: /var/lib/besu
+  mountPath: /data
   volumeName: data
   accessModes:
     - ReadWriteOnce

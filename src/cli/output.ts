@@ -14,6 +14,7 @@ type OutputPayload = {
   faucet: GeneratedNodeKey;
   genesis: unknown;
   validators: readonly IndexedNode[];
+  staticNodes: readonly string[];
 };
 
 type ConfigMapSpec = {
@@ -46,6 +47,15 @@ const printGroup = (title: string, nodes: readonly IndexedNode[]): void => {
   process.stdout.write("\n");
 };
 
+const printStaticNodes = (staticNodes: readonly string[]): void => {
+  if (staticNodes.length === 0) {
+    return;
+  }
+
+  process.stdout.write(`${accent("Static Nodes")}\n`);
+  process.stdout.write(`${JSON.stringify(staticNodes, null, 2)}\n\n`);
+};
+
 const printFaucet = (faucet: GeneratedNodeKey): void => {
   process.stdout.write(`${accent("Faucet Account")}\n`);
   process.stdout.write(`  address: ${faucet.address}\n`);
@@ -64,6 +74,7 @@ const outputToScreen = (payload: OutputPayload): void => {
   process.stdout.write("\n\n");
   printGenesis("Genesis", genesisJson);
   printGroup("Validator Nodes", payload.validators);
+  printStaticNodes(payload.staticNodes);
   printFaucet(payload.faucet);
 };
 
@@ -121,6 +132,10 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
         `${JSON.stringify({ [spec.key]: spec.value }, null, 2)}\n`
       )
     ),
+    Bun.write(
+      join(directory, "static-nodes.json"),
+      `${JSON.stringify(payload.staticNodes, null, 2)}\n`
+    ),
   ];
 
   await Promise.all(writes);
@@ -138,6 +153,11 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
       name: "besu-genesis",
       key: "genesis.json",
       value: JSON.stringify(payload.genesis, null, 2),
+    },
+    {
+      name: "besu-static-nodes",
+      key: "static-nodes.json",
+      value: JSON.stringify(payload.staticNodes, null, 2),
     },
   ];
   const secretSpecs = [

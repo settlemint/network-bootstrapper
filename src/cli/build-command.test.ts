@@ -13,6 +13,9 @@ const VALIDATOR_LABEL = "validator nodes";
 const VALIDATOR_RETURN = 2;
 const GENESIS_MARKER = '"extraData": "0xextra"';
 const EXPECTED_DEFAULT_VALIDATOR = 4;
+const DEFAULT_STATIC_NODE_PORT = 30_303;
+const CUSTOM_STATIC_NODE_PORT = 40_000;
+const LEADING_DOT_REGEX = /^\./u;
 const HEX_RADIX = 16;
 const PAD_WIDTH = 2;
 const PAD_CHAR = "0";
@@ -44,6 +47,30 @@ const createFactoryStub = () => {
 const expectedAddress = (index: number) => {
   const pattern = index.toString(HEX_RADIX).padStart(PAD_WIDTH, PAD_CHAR);
   return getAddress(`0x${pattern.repeat(ADDRESS_REPEAT)}`);
+};
+
+const expectedPublicKey = (index: number) => {
+  const pattern = index.toString(HEX_RADIX).padStart(PAD_WIDTH, PAD_CHAR);
+  return `0x04${pattern.repeat(PUBLIC_KEY_REPEAT)}` as const;
+};
+
+const expectedStaticNodeUri = (
+  index: number,
+  domain?: string,
+  port: number = DEFAULT_STATIC_NODE_PORT,
+  discoveryPort: number = DEFAULT_STATIC_NODE_PORT
+): string => {
+  const normalizedDomain =
+    domain === undefined || domain.trim().length === 0
+      ? undefined
+      : domain.trim().replace(LEADING_DOT_REGEX, "");
+  const podName = `besu-node-validator-${index}-0`;
+  const serviceName = `besu-node-validator-${index}`;
+  const host = normalizedDomain
+    ? `${podName}.${serviceName}.${normalizedDomain}`
+    : podName;
+  const publicKey = expectedPublicKey(index).slice(2);
+  return `enode://${publicKey}@${host}:${port}?discport=${discoveryPort}`;
 };
 
 const captureStdout = () => {
@@ -152,9 +179,14 @@ describe("CLI command bootstrap", () => {
     const output = stdout.read();
     expect(output).toContain("Genesis");
     expect(output).toContain("Validator Nodes");
+    expect(output).toContain("Static Nodes");
     expect(output).toContain(GENESIS_MARKER);
     expect(loadAllocationsPath).toBe("/tmp/alloc.json");
     expect(outputInvocation?.type).toBe("screen");
+    expect(outputInvocation?.payload.staticNodes).toEqual([
+      expectedStaticNodeUri(FIRST_VALIDATOR_INDEX),
+      expectedStaticNodeUri(SECOND_VALIDATOR_INDEX),
+    ]);
   });
 
   test("createCliCommand wires metadata", () => {
@@ -225,6 +257,12 @@ describe("CLI command bootstrap", () => {
         "2048",
         "--contract-size-limit",
         "10000",
+        "--static-node-domain",
+        "network.svc.cluster.local",
+        "--static-node-port",
+        `${CUSTOM_STATIC_NODE_PORT}`,
+        "--static-node-discovery-port",
+        "0",
       ],
       { from: "node" }
     );
@@ -232,6 +270,113 @@ describe("CLI command bootstrap", () => {
     expect(promptCalls).toEqual([]);
     expect(stdout.read()).toContain("Genesis");
     expect(stdout.read()).toContain(GENESIS_MARKER);
+  });
+
+  test("createCliCommand accepts static node configuration flags", async () => {
+    const factory = createFactoryStub();
+    let capturedPayload: OutputPayload | undefined;
+
+    const deps: BootstrapDependencies = {
+      factory,
+      promptForCount: (_label, provided, defaultValue) =>
+        Promise.resolve(provided ?? defaultValue),
+      promptForGenesis: (_service, { faucetAddress }) =>
+        Promise.resolve({
+          algorithm: ALGORITHM.QBFT,
+          config: {
+            chainId: 77,
+            faucetWalletAddress: faucetAddress,
+            gasLimit: "0x1",
+            secondsPerBlock: 2,
+          },
+          genesis: { config: {}, extraData: "0xextra" } as any,
+        }),
+      service: {} as any,
+      loadAllocations: () =>
+        Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      outputResult: (_type, payload) => {
+        capturedPayload = payload;
+        return Promise.resolve();
+      },
+    };
+
+    const command = createCliCommand(deps);
+    await command.parseAsync(
+      [
+        "node",
+        "cli",
+        "generate",
+        "--validators",
+        "1",
+        "--static-node-domain",
+        "network.svc.cluster.local",
+        "--static-node-port",
+        "40000",
+        "--static-node-discovery-port",
+        "0",
+      ],
+      { from: "node" }
+    );
+
+    expect(capturedPayload?.staticNodes).toEqual([
+      expectedStaticNodeUri(
+        1,
+        "network.svc.cluster.local",
+        CUSTOM_STATIC_NODE_PORT,
+        0
+      ),
+    ]);
+  });
+
+  test("runBootstrap builds static nodes with domain and custom ports", async () => {
+    const factory = createFactoryStub();
+    let capturedPayload: OutputPayload | undefined;
+
+    const deps: BootstrapDependencies = {
+      factory,
+      promptForCount: (_label, provided, defaultValue) =>
+        Promise.resolve(provided ?? defaultValue),
+      promptForGenesis: (_service, { validatorAddresses, faucetAddress }) => {
+        expect(validatorAddresses).toHaveLength(1);
+        expect(faucetAddress).toBe(expectedAddress(2));
+        return Promise.resolve({
+          algorithm: ALGORITHM.QBFT,
+          config: {
+            chainId: 123,
+            faucetWalletAddress: faucetAddress,
+            gasLimit: "0x1",
+            secondsPerBlock: 2,
+          },
+          genesis: { config: {}, extraData: "0xextra" } as any,
+        });
+      },
+      service: {} as any,
+      loadAllocations: () =>
+        Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      outputResult: (_type, payload) => {
+        capturedPayload = payload;
+        return Promise.resolve();
+      },
+    };
+
+    await runBootstrap(
+      {
+        validators: 1,
+        staticNodeDomain: "network.svc.cluster.local",
+        staticNodePort: CUSTOM_STATIC_NODE_PORT,
+        staticNodeDiscoveryPort: 0,
+      },
+      deps
+    );
+
+    expect(capturedPayload?.staticNodes).toEqual([
+      expectedStaticNodeUri(
+        1,
+        "network.svc.cluster.local",
+        CUSTOM_STATIC_NODE_PORT,
+        0
+      ),
+    ]);
   });
 
   test("runBootstrap bypasses genesis prompts when CLI overrides provided", async () => {

@@ -42,6 +42,15 @@ spec:
             {{- with .Values.settings.validators }}
             - --validators={{ . }}
             {{- end }}
+            {{- with .Values.settings.staticNodeDomain }}
+            - --static-node-domain={{ . }}
+            {{- end }}
+            {{- with .Values.settings.staticNodePort }}
+            - --static-node-port={{ . }}
+            {{- end }}
+            {{- with .Values.settings.staticNodeDiscoveryPort }}
+            - --static-node-discovery-port={{ . }}
+            {{- end }}
             {{- with .Values.settings.allocations }}
             - --allocations={{ . }}
             {{- end }}
