@@ -82,7 +82,7 @@ A Helm chart for Kubernetes
 | initContainers.shared | list|string | `[]` | Init containers applied to both validator and RPC pods. |
 | initContainers.validator | list|string | `[]` | Additional init containers exclusively for validator pods. |
 | livenessProbe.failureThreshold | int | `3` | Consecutive failures required before the container is restarted. |
-| livenessProbe.httpGet.path | string | `"/readiness?minPeers=1&maxBlocksBehind=100"` | HTTP path used for liveness probing. |
+| livenessProbe.httpGet.path | string | `"/readiness?minPeers=1&maxBlocksBehind=10000"` | HTTP path used for liveness probing. |
 | livenessProbe.httpGet.port | string|int | `"json-rpc"` | Target container port serving the liveness endpoint. |
 | livenessProbe.initialDelaySeconds | int | `30` | Seconds to wait before starting liveness checks. |
 | livenessProbe.periodSeconds | int | `10` | Frequency of liveness checks in seconds. |
@@ -119,7 +119,7 @@ A Helm chart for Kubernetes
 | podLabels | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
 | readinessProbe.failureThreshold | int | `3` | Consecutive failures required before the pod is considered unready. |
-| readinessProbe.httpGet.path | string | `"/readiness?minPeers=0&maxBlocksBehind=100"` | HTTP path used for readiness probing, including peer/sync thresholds. |
+| readinessProbe.httpGet.path | string | `"/liveness"` | HTTP path used for readiness probing, including peer/sync thresholds. |
 | readinessProbe.httpGet.port | string|int | `"json-rpc"` | Target container port serving the readiness endpoint. |
 | readinessProbe.initialDelaySeconds | int | `15` | Seconds to wait before starting readiness checks. |
 | readinessProbe.periodSeconds | int | `5` | Frequency of readiness checks in seconds. |
