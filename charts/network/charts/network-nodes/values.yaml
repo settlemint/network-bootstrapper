@@ -334,7 +334,7 @@ livenessProbe:
   # HTTP GET probe configuration hitting the Besu liveness endpoint.
   httpGet:
     # -- (string) HTTP path used for liveness probing.
-    path: /readiness?minPeers=1&maxBlocksBehind=100
+    path: /readiness?minPeers=1&maxBlocksBehind=10000
     # -- (string|int) Target container port serving the liveness endpoint.
     port: json-rpc
   # -- (int) Seconds to wait before starting liveness checks.
@@ -351,7 +351,7 @@ readinessProbe:
   # HTTP GET probe configuration hitting the Besu readiness endpoint.
   httpGet:
     # -- (string) HTTP path used for readiness probing, including peer/sync thresholds.
-    path: /readiness?minPeers=0&maxBlocksBehind=100
+    path: /liveness
     # -- (string|int) Target container port serving the readiness endpoint.
     port: json-rpc
   # -- (int) Seconds to wait before starting readiness checks.
