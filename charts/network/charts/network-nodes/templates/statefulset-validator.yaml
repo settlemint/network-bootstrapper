@@ -27,7 +27,6 @@ spec:
   {{- $useClaimTemplate := and $persistenceEnabled (not $useExistingClaim) }}
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
-<<<<<<< HEAD
   {{- $globalNodes := .Values.global.networkNodes | default (dict) }}
   {{- $genesisConfigMapName := default "besu-genesis" (get $globalNodes "genesisConfigMapName") }}
   {{- $staticNodesConfigMapName := default "besu-static-nodes" (get $globalNodes "staticNodesConfigMapName") }}
