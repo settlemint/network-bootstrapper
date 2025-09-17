@@ -1,6 +1,6 @@
 # network-bootstrapper
 
-Generate node identities, configure consensus, and emit a Besu genesis.
+Generate node identities, configure consensus, and emit a Besu genesis. Then use the chart to spin up a network.
 
 ## Helm chart
 
