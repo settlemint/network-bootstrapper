@@ -18,7 +18,7 @@ A Helm chart for Kubernetes
 | clusterDomain | string | `"svc.cluster.local"` | Kubernetes cluster DNS suffix. Used when staticNodeDomain is not explicitly provided. |
 | defaultStaticNodeDiscoveryPort | int | `30303` | Default discovery port for generated static node URIs when per-run settings are omitted. |
 | defaultStaticNodePort | int | `30303` | Default P2P port for generated static node URIs when per-run settings are omitted. |
-| fullnameOverride | string | `""` | Fully qualified name override for resources created by this release. |
+| fullnameOverride | string | `"bootstrapper"` | Fully qualified name override for resources created by this release. |
 | image | object | `{"pullPolicy":"IfNotPresent","repository":"ghcr.io/settlemint/network-bootstrapper","tag":""}` | Container image settings for the network bootstrapper workload. See https://kubernetes.io/docs/concepts/containers/images/ for background. |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy controlling when Kubernetes re-fetches the image layer manifest. |
 | image.repository | string | `"ghcr.io/settlemint/network-bootstrapper"` | OCI repository hosting the network bootstrapper image. |

@@ -140,7 +140,6 @@ A Helm chart for Kubernetes
 | resources | object | `{}` |  |
 | rpcReplicaCount | int | `2` |  |
 | securityContext | object | `{}` |  |
-| service.p2pType | string | `"NodePort"` |  |
 | service.ports.discovery | int | `30303` |  |
 | service.ports.graphql | int | `8547` |  |
 | service.ports.metrics | int | `9545` |  |
