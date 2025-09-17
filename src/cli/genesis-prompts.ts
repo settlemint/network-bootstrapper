@@ -61,6 +61,7 @@ type GenesisPromptPreset = {
 
 type GenesisPromptOptions = {
   allocations?: Record<string, BesuAllocAccount>;
+  autoAcceptDefaults?: boolean;
   faucetAddress: HexAddress;
   overrides?: Partial<PromptOverrides>;
   preset?: GenesisPromptPreset;
@@ -103,6 +104,7 @@ const promptForGenesisConfig = async (
   service: BesuGenesisService,
   {
     allocations = {},
+    autoAcceptDefaults = false,
     faucetAddress,
     overrides = {},
     preset,
@@ -116,6 +118,8 @@ const promptForGenesisConfig = async (
 
   const defaults = createDefaultNetworkSettings();
 
+  const fallbackAlgorithm = ALGORITHM.QBFT;
+
   let resolvedAlgorithm: Algorithm;
   if (preset?.algorithm) {
     if (!Object.values(ALGORITHM).includes(preset.algorithm)) {
@@ -124,6 +128,8 @@ const promptForGenesisConfig = async (
       );
     }
     resolvedAlgorithm = preset.algorithm;
+  } else if (autoAcceptDefaults) {
+    resolvedAlgorithm = fallbackAlgorithm;
   } else {
     const algorithmSelection = await selectFn<Algorithm | typeof ABORT_OPTION>({
       message: accent("Select consensus algorithm"),
@@ -142,66 +148,103 @@ const promptForGenesisConfig = async (
     resolvedAlgorithm = algorithmSelection;
   }
 
-  const chainId = preset?.chainId
-    ? ensurePositiveInteger(preset.chainId, "Chain ID")
-    : await promptForInteger({
-        defaultValue: defaults.chainId,
-        labelText: "Chain ID",
-        message: "Chain ID",
-        min: 1,
-        prompt: inputFn,
-      });
+  let chainId: number;
+  if (preset?.chainId !== undefined) {
+    chainId = ensurePositiveInteger(preset.chainId, "Chain ID");
+  } else if (autoAcceptDefaults) {
+    chainId = defaults.chainId;
+  } else {
+    chainId = await promptForInteger({
+      defaultValue: defaults.chainId,
+      labelText: "Chain ID",
+      message: "Chain ID",
+      min: 1,
+      prompt: inputFn,
+    });
+  }
 
-  const secondsPerBlock = preset?.secondsPerBlock
-    ? ensurePositiveInteger(preset.secondsPerBlock, "Seconds per block")
-    : await promptForInteger({
-        defaultValue: defaults.secondsPerBlock,
-        labelText: "Seconds per block",
-        message: "Seconds per block",
-        min: 1,
-        prompt: inputFn,
-      });
+  let secondsPerBlock: number;
+  if (preset?.secondsPerBlock !== undefined) {
+    secondsPerBlock = ensurePositiveInteger(
+      preset.secondsPerBlock,
+      "Seconds per block"
+    );
+  } else if (autoAcceptDefaults) {
+    secondsPerBlock = defaults.secondsPerBlock;
+  } else {
+    secondsPerBlock = await promptForInteger({
+      defaultValue: defaults.secondsPerBlock,
+      labelText: "Seconds per block",
+      message: "Seconds per block",
+      min: 1,
+      prompt: inputFn,
+    });
+  }
 
-  const gasLimitInput = preset?.gasLimit
-    ? ensurePositiveBigIntString(preset.gasLimit, "Gas limit")
-    : await promptForBigIntString({
-        defaultValue: defaults.gasLimit,
-        labelText: "Block gas limit",
-        message: "Block gas limit (decimal)",
-        prompt: inputFn,
-      });
+  let gasLimitInput: string;
+  if (preset?.gasLimit !== undefined) {
+    gasLimitInput = ensurePositiveBigIntString(preset.gasLimit, "Gas limit");
+  } else if (autoAcceptDefaults) {
+    gasLimitInput = defaults.gasLimit;
+  } else {
+    gasLimitInput = await promptForBigIntString({
+      defaultValue: defaults.gasLimit,
+      labelText: "Block gas limit",
+      message: "Block gas limit (decimal)",
+      prompt: inputFn,
+    });
+  }
 
-  const gasPrice =
-    preset?.gasPrice ??
-    (await promptForInteger({
+  let gasPrice: number;
+  if (preset?.gasPrice !== undefined) {
+    gasPrice = ensureNonNegativeInteger(preset.gasPrice, "Gas price");
+  } else if (autoAcceptDefaults) {
+    gasPrice = defaults.gasPrice;
+  } else {
+    gasPrice = await promptForInteger({
       defaultValue: defaults.gasPrice,
       labelText: "Base gas price",
       message: "Base gas price (wei)",
       min: 0,
       prompt: inputFn,
-    }));
+    });
+    gasPrice = ensureNonNegativeInteger(gasPrice, "Gas price");
+  }
+
+  let evmStackSize: number;
+  if (preset?.evmStackSize !== undefined) {
+    evmStackSize = ensurePositiveInteger(preset.evmStackSize, "EVM stack size");
+  } else if (autoAcceptDefaults) {
+    evmStackSize = defaults.evmStackSize;
+  } else {
+    evmStackSize = await promptForInteger({
+      defaultValue: defaults.evmStackSize,
+      labelText: "EVM stack size",
+      message: "EVM stack size",
+      min: 1,
+      prompt: inputFn,
+    });
+  }
+
+  let contractSizeLimit: number;
+  if (preset?.contractSizeLimit !== undefined) {
+    contractSizeLimit = ensurePositiveInteger(
+      preset.contractSizeLimit,
+      "Contract size limit"
+    );
+  } else if (autoAcceptDefaults) {
+    contractSizeLimit = defaults.contractSizeLimit;
+  } else {
+    contractSizeLimit = await promptForInteger({
+      defaultValue: defaults.contractSizeLimit,
+      labelText: "Contract size limit",
+      message: "Contract size limit (bytes)",
+      min: 1,
+      prompt: inputFn,
+    });
+  }
 
   const normalizedGasPrice = ensureNonNegativeInteger(gasPrice, "Gas price");
-
-  const evmStackSize = preset?.evmStackSize
-    ? ensurePositiveInteger(preset.evmStackSize, "EVM stack size")
-    : await promptForInteger({
-        defaultValue: defaults.evmStackSize,
-        labelText: "EVM stack size",
-        message: "EVM stack size",
-        min: 1,
-        prompt: inputFn,
-      });
-
-  const contractSizeLimit = preset?.contractSizeLimit
-    ? ensurePositiveInteger(preset.contractSizeLimit, "Contract size limit")
-    : await promptForInteger({
-        defaultValue: defaults.contractSizeLimit,
-        labelText: "Contract size limit",
-        message: "Contract size limit (bytes)",
-        min: 1,
-        prompt: inputFn,
-      });
 
   const config: BesuNetworkConfig = {
     chainId,

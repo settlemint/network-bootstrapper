@@ -18,6 +18,7 @@ import { createCountParser, promptForCount } from "./prompt-helpers.ts";
 
 type CliOptions = {
   allocations?: string;
+  acceptDefaults?: boolean;
   chainId?: number;
   consensus?: Algorithm;
   contractSizeLimit?: number;
@@ -82,14 +83,43 @@ const runBootstrap = async (
   options: CliOptions,
   deps: BootstrapDependencies
 ): Promise<void> => {
-  const validatorsCount = await deps.promptForCount(
+  const {
+    acceptDefaults = false,
+    allocations,
+    chainId,
+    consensus,
+    contractSizeLimit,
+    evmStackSize,
+    gasLimit,
+    gasPrice,
+    outputType,
+    rpcNodes: rpcNodeOption,
+    secondsPerBlock,
+    validators: validatorOption,
+  } = options;
+
+  const resolveCount = (
+    label: string,
+    provided: number | undefined,
+    defaultValue: number
+  ): Promise<number> => {
+    if (provided !== undefined) {
+      return Promise.resolve(provided);
+    }
+    if (acceptDefaults) {
+      return Promise.resolve(defaultValue);
+    }
+    return deps.promptForCount(label, undefined, defaultValue);
+  };
+
+  const validatorsCount = await resolveCount(
     "validator nodes",
-    options.validators,
+    validatorOption,
     DEFAULT_VALIDATOR_COUNT
   );
-  const rpcNodeCount = await deps.promptForCount(
+  const rpcNodeCount = await resolveCount(
     "RPC nodes",
-    options.rpcNodes,
+    rpcNodeOption,
     DEFAULT_RPC_COUNT
   );
 
@@ -101,26 +131,26 @@ const runBootstrap = async (
 
   const faucetAddress: HexAddress = faucet.address;
 
-  const allocationOverrides = options.allocations
-    ? await deps.loadAllocations(options.allocations)
+  const allocationOverrides = allocations
+    ? await deps.loadAllocations(allocations)
     : {};
 
   const { genesis } = await deps.promptForGenesis(deps.service, {
     faucetAddress,
     allocations: allocationOverrides,
     preset: {
-      algorithm: options.consensus,
-      chainId: options.chainId,
-      secondsPerBlock: options.secondsPerBlock,
-      gasLimit: options.gasLimit,
-      gasPrice: options.gasPrice,
-      evmStackSize: options.evmStackSize,
-      contractSizeLimit: options.contractSizeLimit,
+      algorithm: consensus,
+      chainId,
+      secondsPerBlock,
+      gasLimit,
+      gasPrice,
+      evmStackSize,
+      contractSizeLimit,
     },
+    autoAcceptDefaults: acceptDefaults,
     validatorAddresses,
   });
 
-  const outputType = options.outputType ?? "screen";
   const payload: OutputPayload = {
     faucet,
     genesis,
@@ -128,7 +158,7 @@ const runBootstrap = async (
     validators,
   };
 
-  await deps.outputResult(outputType, payload);
+  await deps.outputResult(outputType ?? "screen", payload);
 };
 
 /* c8 ignore start */
@@ -155,16 +185,18 @@ const createCliCommand = (
     .option(
       "-v, --validators <count>",
       "Number of validator nodes to generate.",
-      createCountParser("Validators")
+      createCountParser("Validators"),
+      DEFAULT_VALIDATOR_COUNT
     )
     .option(
       "-r, --rpc-nodes <count>",
       "Number of RPC nodes to generate.",
-      createCountParser("RPC nodes")
+      createCountParser("RPC nodes"),
+      DEFAULT_RPC_COUNT
     )
     .option(
       "-a, --allocations <file>",
-      "Path to a genesis allocations JSON file."
+      "Path to a genesis allocations JSON file. (default: none)"
     )
     .option(
       "-o, --outputType <type>",
@@ -182,7 +214,9 @@ const createCliCommand = (
     )
     .option(
       "--consensus <algorithm>",
-      `Consensus algorithm (${Object.values(ALGORITHM).join(", ")}).`,
+      `Consensus algorithm (${Object.values(ALGORITHM).join(", ")}). (default: ${
+        ALGORITHM.QBFT
+      })`,
       (value: string): Algorithm => {
         const normalized = value.trim().toLowerCase();
         const match = Object.values(ALGORITHM).find(
@@ -198,39 +232,55 @@ const createCliCommand = (
     )
     .option(
       "--chain-id <number>",
-      "Chain ID for the genesis config.",
+      "Chain ID for the genesis config. (default: random between 40000 and 50000)",
       (value: string): number => parsePositiveInteger(value, "Chain ID")
     )
     .option(
       "--seconds-per-block <number>",
-      "Block time in seconds.",
+      "Block time in seconds. (default: 2)",
       (value: string): number =>
         parsePositiveInteger(value, "Seconds per block")
     )
     .option(
       "--gas-limit <decimal>",
-      "Block gas limit in decimal form.",
+      "Block gas limit in decimal form. (default: 9007199254740991)",
       (value: string): string => parsePositiveBigInt(value, "Gas limit")
     )
     .option(
       "--gas-price <number>",
-      "Base gas price (wei).",
+      "Base gas price (wei). (default: 0)",
       (value: string): number => parseNonNegativeInteger(value, "Gas price")
     )
     .option(
       "--evm-stack-size <number>",
-      "EVM stack size limit.",
+      "EVM stack size limit. (default: 2048)",
       (value: string): number => parsePositiveInteger(value, "EVM stack size")
     )
     .option(
       "--contract-size-limit <number>",
-      "Contract size limit in bytes.",
+      "Contract size limit in bytes. (default: 2147483647)",
       (value: string): number =>
         parsePositiveInteger(value, "Contract size limit")
+    )
+    .option(
+      "--accept-defaults",
+      "Accept default values for all prompts when CLI flags are omitted. (default: disabled)"
     );
 
-  command.action(async (options: CliOptions) => {
-    await runBootstrap(options, deps);
+  command.action(async (options: CliOptions, cmd: Command) => {
+    const normalizedOptions: CliOptions = {
+      ...options,
+      validators:
+        cmd.getOptionValueSource("validators") === "default"
+          ? undefined
+          : options.validators,
+      rpcNodes:
+        cmd.getOptionValueSource("rpcNodes") === "default"
+          ? undefined
+          : options.rpcNodes,
+    };
+
+    await runBootstrap(normalizedOptions, deps);
   });
 
   return command;

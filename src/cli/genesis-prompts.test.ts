@@ -26,6 +26,11 @@ const CONTRACT_SIZE_LIMIT = 10_000;
 const NEGATIVE_PRESET_INT = -1;
 const NEGATIVE_BIG_VALUE = "-1";
 const NON_NUMERIC_BIG_VALUE = "not-a-number";
+const MIN_CHAIN_ID = 40_000;
+const CHAIN_ID_RANGE = 10_000;
+const DEFAULT_EVM_STACK_SIZE = 2048;
+const DEFAULT_CONTRACT_SIZE_LIMIT = 2_147_483_647;
+const RANDOM_HALF = 0.5;
 
 const withCancel = <T>(value: T) => {
   const promise = Promise.resolve(value) as Promise<T> & { cancel: () => void };
@@ -322,5 +327,55 @@ describe("promptForGenesisConfig", () => {
         validatorAddresses: validators,
       })
     ).rejects.toThrow("Gas limit must be a positive integer.");
+  });
+
+  test("autoAcceptDefaults uses defaults without prompting", async () => {
+    const { service, generated } = createServiceStub();
+    const originalRandom = Math.random;
+    Math.random = () => RANDOM_HALF;
+
+    const overrides: PromptOverrides = {
+      selectPrompt: () => {
+        throw new Error(
+          "Select prompt should not be called when accepting defaults."
+        );
+      },
+      inputPrompt: () => {
+        throw new Error(
+          "Input prompt should not be called when accepting defaults."
+        );
+      },
+    };
+
+    try {
+      const result = await promptForGenesisConfig(
+        service as unknown as BesuGenesisService,
+        {
+          allocations: {} as Record<string, BesuAllocAccount>,
+          faucetAddress: faucet,
+          overrides,
+          autoAcceptDefaults: true,
+          validatorAddresses: validators,
+        }
+      );
+
+      const expectedChainId =
+        Math.floor(RANDOM_HALF * CHAIN_ID_RANGE) + MIN_CHAIN_ID;
+      expect(result.algorithm).toBe(ALGORITHM.QBFT);
+      expect(result.config.chainId).toBe(expectedChainId);
+      expect(result.config.secondsPerBlock).toBe(2);
+      expect(result.config.gasLimit).toBe(
+        `0x${BigInt(GAS_LIMIT_DECIMAL).toString(HEX_RADIX)}`
+      );
+      expect(result.config.gasPrice).toBeUndefined();
+      expect(result.config.evmStackSize).toBe(DEFAULT_EVM_STACK_SIZE);
+      expect(result.config.contractSizeLimit).toBe(DEFAULT_CONTRACT_SIZE_LIMIT);
+      expect(result.genesis).toEqual({
+        ...generated,
+        extraData: "0xextra",
+      });
+    } finally {
+      Math.random = originalRandom;
+    }
   });
 });

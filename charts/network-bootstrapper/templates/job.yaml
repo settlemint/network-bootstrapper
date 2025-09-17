@@ -1,16 +1,12 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: batch/v1
+kind: Job
 metadata:
   name: {{ include "network-bootstrapper.fullname" . }}
   labels:
     {{- include "network-bootstrapper.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
-  selector:
-    matchLabels:
-      {{- include "network-bootstrapper.selectorLabels" . | nindent 6 }}
+  backoffLimit: 3
+  completions: 1
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -23,6 +19,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      restartPolicy: Never
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -40,18 +37,41 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
-          {{- with .Values.livenessProbe }}
-          livenessProbe:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.readinessProbe }}
-          readinessProbe:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          args:
+            {{- with .Values.settings.validators }}
+            - --validators={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.rpcNodes }}
+            - --rpc-nodes={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.allocations }}
+            - --allocations={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.outputType }}
+            - --outputType={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.consensus }}
+            - --consensus={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.chainId }}
+            - --chain-id={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.secondsPerBlock }}
+            - --seconds-per-block={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.gasLimit }}
+            - --gas-limit={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.gasPrice }}
+            - --gas-price={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.evmStackSize }}
+            - --evm-stack-size={{ . | quote }}
+            {{- end }}
+            {{- with .Values.settings.contractSizeLimit }}
+            - --contract-size-limit={{ . | quote }}
+            {{- end }}
+            - --accept-defaults
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

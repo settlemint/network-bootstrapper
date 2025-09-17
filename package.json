@@ -24,6 +24,7 @@
     "check": "ultracite check",
     "check:fix": "ultracite fix",
     "test": "bun test",
+    "helm": "helm upgrade --install networkbootstrapper ./charts/network-bootstrapper -n networkbootstrapper --create-namespace --timeout 15m",
     "docs:helm": "helm-docs --chart-search-root=. --skip-version-footer",
     "docs:cli": "cat README.tpl > README.md && echo '\n```' >> README.md && bun src/index.ts --help >> README.md && echo '```' >> README.md"
   },

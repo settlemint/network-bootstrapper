@@ -156,6 +156,52 @@ jobs:
           provenance: mode=max
           sbom: true
 
+      - name: Set up Python
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          check-latest: true
+
+      - name: Set up Helm
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        uses: azure/setup-helm@v4
+
+      - name: Set up chart-testing
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        uses: helm/chart-testing-action@v2.7.0
+
+      - name: Determine chart changes
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        id: ct-changed
+        env:
+          CT_CONFIG: .github/ct.yaml
+        run: |
+          changed=$(ct list-changed --config "$CT_CONFIG")
+          if [[ -n "$changed" ]]; then
+            printf "changed=true\n" >> "$GITHUB_OUTPUT"
+            echo "$changed"
+          else
+            printf "changed=false\n" >> "$GITHUB_OUTPUT"
+            echo "No chart changes detected"
+          fi
+
+      - name: Run chart-testing (lint)
+        if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
+        env:
+          CT_CONFIG: .github/ct.yaml
+        run: ct lint --config "$CT_CONFIG"
+
+      - name: Create kind cluster
+        if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
+        uses: helm/kind-action@v1.12.0
+
+      - name: Run chart-testing (install)
+        if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
+        env:
+          CT_CONFIG: .github/ct.yaml
+        run: ct install --config "$CT_CONFIG"
+
       # Label QA results (PR only)
       - name: Label QA build status
         if: |
