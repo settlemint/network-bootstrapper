@@ -59,6 +59,8 @@ jobs:
           SLACK_BOT_TOKEN: op://platform/slack-bot/SLACK_BOT_TOKEN
           SLACK_CHANNEL_ID: op://platform/slack-bot/SLACK_CHANNEL_ID
           PAT_TOKEN: op://platform/github-commit-pat/credential
+          HARBOR_USER: op://platform/harbor/username
+          HARBOR_PASS: op://platform/harbor/password
 
       # Label QA as running and notify Slack (only for non-draft PRs)
       - name: Label QA as running
@@ -270,31 +272,26 @@ jobs:
             ${{ steps.secret-scan.outcome == 'success' && 'success' || 'failure'
             }}
 
-      # Publish charts via Helm chart-releaser so gh-pages stays in sync with tagged releases
-      - name: Configure git author for chart releaser
+      - name: Login to Harbor
         if: |
-          github.event_name == 'push' &&
-          startsWith(github.ref, 'refs/tags/')
-        run: |
-          git config user.name "SettleMint Release Bot"
-          git config user.email "support@settlemint.com"
-
-      - name: Fetch gh-pages reference for chart releaser
-        if: |
-          github.event_name == 'push' &&
-          startsWith(github.ref, 'refs/tags/')
-        run: |
-          git fetch origin gh-pages:refs/remotes/origin/gh-pages
-
-      - name: Publish Helm charts with chart-releaser
-        if: |
-          github.event_name == 'push' &&
-          startsWith(github.ref, 'refs/tags/')
-        uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
-        env:
-          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github.event_name == 'push' ||
+          (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
         with:
-          charts_dir: charts
+          registry: harbor.settlemint.com
+          username: ${{ env.HARBOR_USER }}
+          password: ${{ env.HARBOR_PASS }}
+
+      - name: Package chart
+        if: |
+          github.event_name == 'push' ||
+          (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+        run: bun run package:pack
+      - name: Push chart to Harbor
+        if: |
+          github.event_name == 'push' ||
+          (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+        run: bun run package:push:harbor
 
       # Check PR review status (PR and PR review events only)
       - name: Check PR review status
