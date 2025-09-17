@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { V1ConfigMap } from "@kubernetes/client-node";
+import type { V1ConfigMap, V1Secret } from "@kubernetes/client-node";
 import { CoreV1Api, KubeConfig } from "@kubernetes/client-node";
 
 import type { GeneratedNodeKey } from "../keys/node-key-factory.ts";
@@ -22,6 +22,8 @@ type ConfigMapSpec = {
   name: string;
   value: string;
 };
+
+type SecretSpec = ConfigMapSpec;
 
 const OUTPUT_DIR = "out";
 const NAMESPACE_PATH =
@@ -133,13 +135,27 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
   const validatorSpecs = createSpecsForGroup("validator", payload.validators);
   const rpcSpecs = createSpecsForGroup("rpc-node", payload.rpcNodes);
   const allSpecs = [...validatorSpecs, ...rpcSpecs];
+  const configMapSpecs = [
+    ...allSpecs.filter((spec) => spec.key !== "privateKey"),
+    ...createFaucetConfigSpecs(payload.faucet),
+    {
+      name: "besu-genesis",
+      key: "genesis.json",
+      value: JSON.stringify(payload.genesis, null, 2),
+    },
+  ];
+  const secretSpecs = [
+    ...allSpecs.filter((spec) => spec.key === "privateKey"),
+    ...createFaucetSecretSpecs(payload.faucet),
+  ];
 
-  await Promise.all(
-    allSpecs.map((spec) => upsertConfigMap(client, namespace, spec))
-  );
+  await Promise.all([
+    ...configMapSpecs.map((spec) => upsertConfigMap(client, namespace, spec)),
+    ...secretSpecs.map((spec) => upsertSecret(client, namespace, spec)),
+  ]);
 
   process.stdout.write(
-    `Applied ${allSpecs.length} ConfigMaps in namespace ${namespace}.\n`
+    `Applied ${configMapSpecs.length} ConfigMaps and ${secretSpecs.length} Secrets in namespace ${namespace}.\n`
   );
 };
 
@@ -165,10 +181,24 @@ const createSpecsForGroup = (
   });
 };
 
+const createFaucetConfigSpecs = (faucet: GeneratedNodeKey): ConfigMapSpec[] => [
+  { name: "besu-faucet-address", key: "address", value: faucet.address },
+  { name: "besu-faucet-pubkey", key: "publicKey", value: faucet.publicKey },
+];
+
+const createFaucetSecretSpecs = (faucet: GeneratedNodeKey): SecretSpec[] => [
+  {
+    name: "besu-faucet-private-key",
+    key: "privateKey",
+    value: faucet.privateKey,
+  },
+];
+
 const createKubernetesClient = async (): Promise<{
   client: CoreV1Api;
   namespace: string;
 }> => {
+  Bun.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   const kubeConfig = new KubeConfig();
   try {
     kubeConfig.loadFromCluster();
@@ -194,7 +224,10 @@ const createKubernetesClient = async (): Promise<{
 
   const client = kubeConfig.makeApiClient(CoreV1Api);
   try {
-    await client.listNamespacedConfigMap({ namespace, limit: 1 });
+    await Promise.all([
+      client.listNamespacedConfigMap({ namespace, limit: 1 }),
+      client.listNamespacedSecret({ namespace, limit: 1 }),
+    ]);
   } catch (error) {
     throw new Error(
       `Kubernetes permissions check failed: ${extractKubernetesError(error)}`
@@ -225,6 +258,32 @@ const upsertConfigMap = async (
 
     throw new Error(
       `Failed to create ConfigMap ${spec.name}: ${extractKubernetesError(error)}`
+    );
+  }
+};
+
+const upsertSecret = async (
+  client: CoreV1Api,
+  namespace: string,
+  spec: SecretSpec
+): Promise<void> => {
+  const body: V1Secret = {
+    metadata: { name: spec.name },
+    stringData: { [spec.key]: spec.value },
+    type: "Opaque",
+  };
+
+  try {
+    await client.createNamespacedSecret({ namespace, body });
+  } catch (error) {
+    if (getStatusCode(error) === HTTP_CONFLICT_STATUS) {
+      throw new Error(
+        `Secret ${spec.name} already exists. Delete it or choose a different output target.`
+      );
+    }
+
+    throw new Error(
+      `Failed to create Secret ${spec.name}: ${extractKubernetesError(error)}`
     );
   }
 };

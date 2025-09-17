@@ -77,7 +77,9 @@ const HEX_RADIX = 16;
 const SAMPLE_VALIDATOR_INDEX = 1;
 const SAMPLE_RPC_INDEX = 2;
 const SAMPLE_FAUCET_INDEX = 99;
-const EXPECTED_CONFIGMAP_COUNT = 8;
+const EXPECTED_CONFIGMAP_COUNT = 9;
+const EXPECTED_SECRET_COUNT = 3;
+const HEX_PREFIX_PATTERN = /^0x/;
 const TEST_CHAIN_ID = 1;
 const HTTP_CONFLICT_STATUS = 409;
 const HTTP_INTERNAL_ERROR_STATUS = 500;
@@ -153,17 +155,23 @@ describe("outputResult", () => {
     await rm("out", { recursive: true, force: true });
   });
 
-  test("kubernetes output creates configmaps", async () => {
+  test("kubernetes output creates configmaps and secrets", async () => {
     const originalLoad = (KubeConfig.prototype as any).loadFromCluster;
     const originalMake = (KubeConfig.prototype as any).makeApiClient;
     const originalFile = Bun.file;
 
-    const created: Array<{
+    const createdConfigMaps: Array<{
       namespace: string;
       name: string;
       data: Record<string, string>;
     }> = [];
-    const listedNamespaces: string[] = [];
+    const createdSecrets: Array<{
+      namespace: string;
+      name: string;
+      data: Record<string, string>;
+    }> = [];
+    const listedConfigNamespaces: string[] = [];
+    const listedSecretNamespaces: string[] = [];
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
@@ -174,7 +182,11 @@ describe("outputResult", () => {
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
           listNamespacedConfigMap: ({ namespace }: { namespace: string }) => {
-            listedNamespaces.push(namespace);
+            listedConfigNamespaces.push(namespace);
+            return Promise.resolve();
+          },
+          listNamespacedSecret: ({ namespace }: { namespace: string }) => {
+            listedSecretNamespaces.push(namespace);
             return Promise.resolve();
           },
           createNamespacedConfigMap: ({
@@ -184,10 +196,24 @@ describe("outputResult", () => {
             namespace: string;
             body: any;
           }) => {
-            created.push({
+            createdConfigMaps.push({
               namespace,
               name: body?.metadata?.name ?? "",
               data: body?.data ?? {},
+            });
+            return Promise.resolve();
+          },
+          createNamespacedSecret: ({
+            namespace,
+            body,
+          }: {
+            namespace: string;
+            body: any;
+          }) => {
+            createdSecrets.push({
+              namespace,
+              name: body?.metadata?.name ?? "",
+              data: body?.stringData ?? {},
             });
             return Promise.resolve();
           },
@@ -202,11 +228,26 @@ describe("outputResult", () => {
 
       await outputResult("kubernetes", samplePayload);
 
-      expect(listedNamespaces).toEqual(["test-namespace"]);
-      expect(created).toHaveLength(EXPECTED_CONFIGMAP_COUNT);
-      const names = created.map((entry) => entry.name).sort();
-      expect(names).toContain("besu-node-validator-1-address");
-      expect(names).toContain("besu-node-rpc-node-2-private-key");
+      expect(listedConfigNamespaces).toEqual(["test-namespace"]);
+      expect(listedSecretNamespaces).toEqual(["test-namespace"]);
+      expect(createdConfigMaps).toHaveLength(EXPECTED_CONFIGMAP_COUNT);
+      expect(createdSecrets).toHaveLength(EXPECTED_SECRET_COUNT);
+      const mapNames = createdConfigMaps.map((entry) => entry.name).sort();
+      expect(mapNames).toContain("besu-node-validator-1-address");
+      expect(mapNames).toContain("besu-genesis");
+      expect(mapNames).toContain("besu-faucet-address");
+      expect(mapNames).toContain("besu-faucet-pubkey");
+      expect(mapNames).not.toContain("besu-faucet-enode");
+      const secretNames = createdSecrets.map((entry) => entry.name).sort();
+      expect(secretNames).toEqual([
+        "besu-faucet-private-key",
+        "besu-node-rpc-node-2-private-key",
+        "besu-node-validator-1-private-key",
+      ]);
+      const privateKeySecret = createdSecrets.find((entry) =>
+        entry.name.endsWith("validator-1-private-key")
+      );
+      expect(privateKeySecret?.data?.privateKey).toMatch(HEX_PREFIX_PATTERN);
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
       (KubeConfig.prototype as any).makeApiClient = originalMake;
@@ -227,7 +268,55 @@ describe("outputResult", () => {
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
           listNamespacedConfigMap: () => Promise.resolve(),
+          listNamespacedSecret: () => Promise.resolve(),
           createNamespacedConfigMap: () => {
+            const error = new Error("already exists");
+            (
+              error as {
+                response?: { statusCode: number; body: { message: string } };
+              }
+            ).response = {
+              statusCode: HTTP_CONFLICT_STATUS,
+              body: { message: "already exists" },
+            };
+            throw error;
+          },
+          createNamespacedSecret: () => Promise.resolve(),
+        };
+        return client as unknown as CoreV1Api;
+      };
+
+      (Bun as any).file = () =>
+        ({
+          text: () => Promise.resolve("conflict-namespace"),
+        }) as unknown as ReturnType<typeof Bun.file>;
+
+      await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
+        "ConfigMap besu-node-validator-1-address already exists. Delete it or choose a different output target."
+      );
+    } finally {
+      (KubeConfig.prototype as any).loadFromCluster = originalLoad;
+      (KubeConfig.prototype as any).makeApiClient = originalMake;
+      (Bun as any).file = originalFile;
+    }
+  });
+
+  test("kubernetes output surfaces secret conflict errors", async () => {
+    const originalLoad = (KubeConfig.prototype as any).loadFromCluster;
+    const originalMake = (KubeConfig.prototype as any).makeApiClient;
+    const originalFile = Bun.file;
+
+    try {
+      (KubeConfig.prototype as any).loadFromCluster =
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
+      (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
+        const client = {
+          listNamespacedConfigMap: () => Promise.resolve(),
+          listNamespacedSecret: () => Promise.resolve(),
+          createNamespacedConfigMap: () => Promise.resolve(),
+          createNamespacedSecret: () => {
             const error = new Error("already exists");
             (
               error as {
@@ -245,11 +334,11 @@ describe("outputResult", () => {
 
       (Bun as any).file = () =>
         ({
-          text: () => Promise.resolve("conflict-namespace"),
+          text: () => Promise.resolve("secret-conflict-namespace"),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "ConfigMap besu-node-validator-1-address already exists. Delete it or choose a different output target."
+        "Secret besu-node-validator-1-private-key already exists. Delete it or choose a different output target."
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -346,6 +435,7 @@ describe("outputResult", () => {
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
           listNamespacedConfigMap: () => Promise.reject(new Error("forbidden")),
+          listNamespacedSecret: () => Promise.resolve(),
         };
         return client as unknown as CoreV1Api;
       };
@@ -377,9 +467,11 @@ describe("outputResult", () => {
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
           listNamespacedConfigMap: () => Promise.resolve(),
+          listNamespacedSecret: () => Promise.resolve(),
           createNamespacedConfigMap: () => {
             throw new Error("boom");
           },
+          createNamespacedSecret: () => Promise.resolve(),
         };
         return client as unknown as CoreV1Api;
       };
@@ -411,12 +503,14 @@ describe("outputResult", () => {
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
           listNamespacedConfigMap: () => Promise.resolve(),
+          listNamespacedSecret: () => Promise.resolve(),
           createNamespacedConfigMap: () => {
             const error = new Error("failed");
             (error as { statusCode?: number }).statusCode =
               HTTP_INTERNAL_ERROR_STATUS;
             throw error;
           },
+          createNamespacedSecret: () => Promise.resolve(),
         };
         return client as unknown as CoreV1Api;
       };
@@ -448,6 +542,7 @@ describe("outputResult", () => {
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
           listNamespacedConfigMap: () => Promise.resolve(),
+          listNamespacedSecret: () => Promise.resolve(),
           createNamespacedConfigMap: () => {
             const error = new Error("response error");
             Object.defineProperty(error, "message", { value: undefined });
@@ -456,6 +551,7 @@ describe("outputResult", () => {
             };
             throw error;
           },
+          createNamespacedSecret: () => Promise.resolve(),
         };
         return client as unknown as CoreV1Api;
       };
@@ -487,6 +583,7 @@ describe("outputResult", () => {
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
           listNamespacedConfigMap: () => Promise.resolve(),
+          listNamespacedSecret: () => Promise.resolve(),
           createNamespacedConfigMap: () => {
             const error = new Error("body error");
             Object.defineProperty(error, "message", { value: undefined });
@@ -495,6 +592,7 @@ describe("outputResult", () => {
             };
             throw error;
           },
+          createNamespacedSecret: () => Promise.resolve(),
         };
         return client as unknown as CoreV1Api;
       };

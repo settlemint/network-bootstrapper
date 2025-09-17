@@ -1,0 +1,98 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "network-bootstrapper.fullname" . }}
+  labels:
+    {{- include "network-bootstrapper.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 3
+  completions: 1
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "network-bootstrapper.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "network-bootstrapper.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- with .Values.settings.validators }}
+            - --validators={{ . }}
+            {{- end }}
+            {{- with .Values.settings.rpcNodes }}
+            - --rpc-nodes={{ . }}
+            {{- end }}
+            {{- with .Values.settings.allocations }}
+            - --allocations={{ . }}
+            {{- end }}
+            {{- with .Values.settings.outputType }}
+            - --outputType={{ . }}
+            {{- end }}
+            {{- with .Values.settings.consensus }}
+            - --consensus={{ . }}
+            {{- end }}
+            {{- with .Values.settings.chainId }}
+            - --chain-id={{ . }}
+            {{- end }}
+            {{- with .Values.settings.secondsPerBlock }}
+            - --seconds-per-block={{ . }}
+            {{- end }}
+            {{- with .Values.settings.gasLimit }}
+            - --gas-limit={{ . }}
+            {{- end }}
+            {{- with .Values.settings.gasPrice }}
+            - --gas-price={{ . }}
+            {{- end }}
+            {{- with .Values.settings.evmStackSize }}
+            - --evm-stack-size={{ . }}
+            {{- end }}
+            {{- with .Values.settings.contractSizeLimit }}
+            - --contract-size-limit={{ . }}
+            {{- end }}
+            - --accept-defaults
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

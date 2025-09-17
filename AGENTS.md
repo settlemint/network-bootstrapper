@@ -6,7 +6,7 @@ The TypeScript sources live in `src/`. CLI flows under `src/cli/` orchestrate pr
 
 ## Build, Test, and Development Commands
 
-Install dependencies with `bun install`. Use `bun run src/index.ts` to execute the bootstrapper locally. Run the full test suite with `bun test`. Type safety is enforced by `bun run typecheck`, and formatting plus lint rules are auto-fixed with `bun run check` (Biome). Combine these commands before pushing to catch regressions early.
+Install dependencies with `bun install`. Use `bun run src/index.ts` to execute the bootstrapper locally. Run the full test suite with `bun test`. Type safety is enforced by `bun run typecheck`, and formatting plus lint rules are auto-fixed with `bun run check:fix` (Biome). Combine these commands before pushing to catch regressions early.
 
 ## Coding Style & Naming Conventions
 

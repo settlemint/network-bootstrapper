@@ -99,7 +99,13 @@ describe("CLI command bootstrap", () => {
       },
       promptForGenesis: (
         _service,
-        { allocations, validatorAddresses, faucetAddress, preset }
+        {
+          allocations,
+          validatorAddresses,
+          faucetAddress,
+          preset,
+          autoAcceptDefaults,
+        }
       ) => {
         expect(validatorAddresses).toEqual([
           expectedAddress(FIRST_VALIDATOR_INDEX),
@@ -109,6 +115,7 @@ describe("CLI command bootstrap", () => {
         expect(allocations).toEqual({
           [expectedAddress(FAUCET_INDEX)]: { balance: "0x01" },
         });
+        expect(autoAcceptDefaults).toBe(false);
         expect(preset).toEqual({
           algorithm: undefined,
           chainId: undefined,
@@ -232,10 +239,7 @@ describe("CLI command bootstrap", () => {
       { from: "node" }
     );
 
-    expect(promptCalls).toEqual([
-      [VALIDATOR_LABEL, 2, EXPECTED_DEFAULT_VALIDATOR],
-      [RPC_LABEL, 1, EXPECTED_DEFAULT_RPC],
-    ]);
+    expect(promptCalls).toEqual([]);
     expect(stdout.read()).toContain("Genesis");
     expect(stdout.read()).toContain(GENESIS_MARKER);
   });
@@ -252,7 +256,8 @@ describe("CLI command bootstrap", () => {
         }
         return Promise.resolve(provided);
       },
-      promptForGenesis: (_service, { preset }) => {
+      promptForGenesis: (_service, { preset, autoAcceptDefaults }) => {
+        expect(autoAcceptDefaults).toBe(false);
         expect(preset).toEqual({
           algorithm: ALGORITHM.IBFTv2,
           chainId: 1234,
@@ -333,6 +338,43 @@ describe("CLI command bootstrap", () => {
     );
   });
 
+  test("createCliCommand strips surrounding quotes from output type", async () => {
+    let capturedOutputType: OutputType | undefined;
+    const deps: BootstrapDependencies = {
+      factory: createFactoryStub(),
+      promptForCount: () => Promise.resolve(EXPECTED_DEFAULT_VALIDATOR),
+      promptForGenesis: async () => ({
+        algorithm: ALGORITHM.QBFT,
+        config: {
+          chainId: 1,
+          faucetWalletAddress: expectedAddress(CLI_FAUCET_INDEX),
+          gasLimit: "0x1",
+          gasPrice: 0,
+          secondsPerBlock: 2,
+        },
+        genesis: { config: {}, extraData: "0x" } as any,
+      }),
+      service: {} as any,
+      loadAllocations: () =>
+        Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      outputResult: (type) => {
+        capturedOutputType = type;
+        return Promise.resolve();
+      },
+    };
+
+    const command = createCliCommand(deps);
+    command.exitOverride();
+    await expect(
+      command.parseAsync(
+        ["node", "cli", '--outputType="kubernetes"', "--accept-defaults"],
+        { from: "node" }
+      )
+    ).resolves.toBeDefined();
+    expect(command.opts().outputType).toBe("kubernetes");
+    expect(capturedOutputType).toBe("kubernetes");
+  });
+
   test("createCliCommand rejects unsupported consensus", async () => {
     const command = createCliCommand();
     command.exitOverride();
@@ -341,5 +383,64 @@ describe("CLI command bootstrap", () => {
     ).rejects.toThrow(
       `Consensus must be one of: ${Object.values(ALGORITHM).join(", ")}.`
     );
+  });
+
+  test("runBootstrap accepts defaults without prompting when flag provided", async () => {
+    const factory = createFactoryStub();
+    let promptCountInvocations = 0;
+    let loadAllocationsInvoked = false;
+
+    const deps: BootstrapDependencies = {
+      factory,
+      promptForCount: () => {
+        promptCountInvocations += 1;
+        return Promise.resolve(0);
+      },
+      promptForGenesis: (_service, options) => {
+        expect(options.autoAcceptDefaults).toBe(true);
+        expect(options.preset).toEqual({
+          algorithm: undefined,
+          chainId: undefined,
+          secondsPerBlock: undefined,
+          gasLimit: undefined,
+          gasPrice: undefined,
+          evmStackSize: undefined,
+          contractSizeLimit: undefined,
+        });
+
+        return Promise.resolve({
+          algorithm: ALGORITHM.QBFT,
+          config: {
+            chainId: 1,
+            faucetWalletAddress: expectedAddress(
+              EXPECTED_DEFAULT_VALIDATOR + EXPECTED_DEFAULT_RPC + 1
+            ),
+            gasLimit: "0x1",
+            secondsPerBlock: 2,
+          },
+          genesis: { config: {}, extraData: "0xextra" } as any,
+        });
+      },
+      service: {} as any,
+      loadAllocations: () => {
+        loadAllocationsInvoked = true;
+        return Promise.resolve({} as Record<string, BesuAllocAccount>);
+      },
+      outputResult: (_type, payload) => {
+        expect(payload.validators).toHaveLength(EXPECTED_DEFAULT_VALIDATOR);
+        expect(payload.rpcNodes).toHaveLength(EXPECTED_DEFAULT_RPC);
+        return Promise.resolve();
+      },
+    };
+
+    await runBootstrap(
+      {
+        acceptDefaults: true,
+      },
+      deps
+    );
+
+    expect(promptCountInvocations).toBe(0);
+    expect(loadAllocationsInvoked).toBe(false);
   });
 });

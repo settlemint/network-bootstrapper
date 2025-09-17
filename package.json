@@ -21,8 +21,14 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "check": "biome check src --write",
-    "test": "bun test"
+    "check": "ultracite check",
+    "check:fix": "ultracite fix",
+    "test": "bun test",
+    "helm": "helm upgrade --install networkbootstrapper ./charts/network-bootstrapper -n networkbootstrapper --create-namespace --timeout 15m",
+    "docs:helm": "helm-docs --chart-search-root=. --skip-version-footer",
+    "docs:cli": "cat README.tpl > README.md && echo '\n```' >> README.md && bun src/index.ts --help >> README.md && echo '```' >> README.md",
+    "package:pack": "helm package charts/network-bootstrapper --destination .",
+    "package:push:harbor": "helm push ./network-bootstrapper-*.tgz oci://harbor.settlemint.com/atk"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
@@ -33,11 +39,13 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@kubernetes/client-node": "1.3.0",
     "@inquirer/prompts": "7.8.6",
+    "@kubernetes/client-node": "1.3.0",
     "commander": "14.0.1",
+    "lefthook": "^1.13.0",
     "ox": "0.9.6",
     "viem": "2.37.6",
+    "yaml": "^2.8.1",
     "zod": "4.1.9"
   }
 }

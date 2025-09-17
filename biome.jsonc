@@ -5,6 +5,12 @@
     "rules": {
       "suspicious": {
         "noConsole": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off"
+      },
+      "nursery": {
+        "useMaxParams": "off"
       }
     }
   },
