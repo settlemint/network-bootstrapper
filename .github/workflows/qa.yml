@@ -120,6 +120,10 @@ jobs:
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         run: bun typecheck
 
+      - name: Set version
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        run: bun run tools/version.ts
+
       - name: Docker meta
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         id: meta
