@@ -41,18 +41,18 @@ jobs:
       packages: write
     steps:
       - name: Checkout repository
-        uses: namespacelabs/nscloud-checkout-action@v7
+        uses: namespacelabs/nscloud-checkout-action@953fed31a6113cc2347ca69c9d823743c65bc84b # v7
         with:
           fetch-depth: ${{ github.event_name == 'push' && 2 || 0 }}
 
       - name: Setup 1Password
-        uses: 1password/load-secrets-action/configure@v3
+        uses: 1password/load-secrets-action/configure@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           service-account-token: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
       - name: Load all secrets
         id: secrets
-        uses: 1password/load-secrets-action@v3
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -99,7 +99,7 @@ jobs:
         if: |
           github.event_name == 'push' ||
           (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
-        uses: docker/login-action@v3
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -130,7 +130,7 @@ jobs:
       - name: Docker meta
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5
         with:
           images: |
             ghcr.io/settlemint/network-bootstrapper
@@ -146,7 +146,7 @@ jobs:
 
       - name: Build and push
         if: github.event_name == 'pull_request' || github.event_name == 'push'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: .
           push: true
@@ -158,18 +158,18 @@ jobs:
 
       - name: Set up Python
         if: github.event_name == 'pull_request' || github.event_name == 'push'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.x"
+          python-version: "3.13.7"
           check-latest: true
 
       - name: Set up Helm
         if: github.event_name == 'pull_request' || github.event_name == 'push'
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
 
       - name: Set up chart-testing
         if: github.event_name == 'pull_request' || github.event_name == 'push'
-        uses: helm/chart-testing-action@v2.7.0
+        uses: helm/chart-testing-action@0d28d3144d3a25ea2cc349d6e59901c4ff469b3b # v2.7.0
 
       - name: Determine chart changes
         if: github.event_name == 'pull_request' || github.event_name == 'push'
@@ -194,7 +194,7 @@ jobs:
 
       - name: Create kind cluster
         if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
-        uses: helm/kind-action@v1.12.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
 
       - name: Run chart-testing (install)
         if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
@@ -253,7 +253,7 @@ jobs:
         if: |
           github.event_name == 'push' ||
           (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
-        uses: docker/login-action@v3
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
         with:
           registry: harbor.settlemint.com
           username: ${{ env.HARBOR_USER }}
@@ -348,17 +348,17 @@ jobs:
       SLACK_CHANNEL_ID: ""
     steps:
       - name: Checkout repository
-        uses: namespacelabs/nscloud-checkout-action@v7
+        uses: namespacelabs/nscloud-checkout-action@953fed31a6113cc2347ca69c9d823743c65bc84b # v7
         with:
           fetch-depth: ${{ github.event_name == 'push' && 2 || 0 }}
 
       - name: Setup 1Password
-        uses: 1password/load-secrets-action/configure@v3
+        uses: 1password/load-secrets-action/configure@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           service-account-token: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
       - name: Load Slack secrets
-        uses: 1password/load-secrets-action@v3
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -402,17 +402,17 @@ jobs:
       SLACK_CHANNEL_ID: ""
     steps:
       - name: Checkout repository
-        uses: namespacelabs/nscloud-checkout-action@v7
+        uses: namespacelabs/nscloud-checkout-action@953fed31a6113cc2347ca69c9d823743c65bc84b # v7
         with:
           fetch-depth: ${{ github.event_name == 'push' && 2 || 0 }}
 
       - name: Setup 1Password
-        uses: 1password/load-secrets-action/configure@v3
+        uses: 1password/load-secrets-action/configure@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           service-account-token: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
       - name: Load Slack secrets
-        uses: 1password/load-secrets-action@v3
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
