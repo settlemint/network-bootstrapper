@@ -8,6 +8,9 @@ const RELEASE_TAG_PATTERN = /^v?[0-9]+\.[0-9]+\.[0-9]+$/;
 const LEADING_V_PATTERN = /^v/;
 const NON_ALPHANUMERIC_PATTERN = /[^0-9A-Za-z-]/g;
 
+const sanitizeIdentifier = (value: string) =>
+  value.replace(NON_ALPHANUMERIC_PATTERN, "");
+
 type VersionInfo = {
   tag: "latest" | "main" | "pr";
   version: string;
@@ -16,7 +19,6 @@ type VersionInfo = {
 type VersionParams = {
   refSlug?: string;
   refName?: string;
-  shaShort?: string;
   buildId?: string;
   startPath?: string;
 };
@@ -83,14 +85,13 @@ async function readRootPackageJson(startPath?: string): Promise<PackageJson> {
  * Generates version string based on Git ref information and base version
  * @param refSlug - Git ref slug
  * @param refName - Git ref name
- * @param shaShort - Short SHA
  * @param baseVersion - Base version from package.json
+ * @param buildId - Optional build identifier (GitHub run counter or similar)
  * @returns Object containing version and tag
  */
 function generateVersionInfo(
   refSlug: string,
   refName: string,
-  shaShort: string,
   baseVersion: string,
   buildId?: string
 ): VersionInfo {
@@ -104,12 +105,9 @@ function generateVersionInfo(
   }
 
   if (refName === "main") {
-    // Prefer numeric/strict BUILD_ID for better Renovate sorting
-    // Fallback to short SHA, and finally a timestamp to ensure uniqueness
-    const sanitize = (value: string) =>
-      value.replace(NON_ALPHANUMERIC_PATTERN, "");
-    const id =
-      sanitize(buildId || "") || sanitize(shaShort || "") || `${Date.now()}`;
+    // Prefer numeric/strict BUILD_ID (or GitHub run counters) for Renovate sorting
+    // Fall back to a timestamp to ensure uniqueness outside CI
+    const id = sanitizeIdentifier(buildId || "") || `${Date.now()}`;
     // Use SemVer pre-release with dot-separated identifiers: -main.<buildid>
     const version = `${baseVersion}-main.${id}`;
     return {
@@ -119,7 +117,8 @@ function generateVersionInfo(
   }
 
   // Default case (PR or other branches)
-  const version = `${baseVersion}-pr${shaShort.replace(LEADING_V_PATTERN, "")}`;
+  const identifier = sanitizeIdentifier(buildId || "") || `${Date.now()}`;
+  const version = `${baseVersion}-pr.${identifier}`;
   return {
     tag: "pr",
     version,
@@ -137,20 +136,20 @@ export async function getVersionInfo(
   const {
     refSlug = process.env.GITHUB_REF_SLUG || "",
     refName = process.env.GITHUB_REF_NAME || "",
-    shaShort = process.env.GITHUB_SHA_SHORT || "",
-    buildId = process.env.BUILD_ID || "",
+    buildId: providedBuildId,
     startPath,
   } = params;
 
+  const buildId =
+    providedBuildId ||
+    process.env.BUILD_ID ||
+    process.env.GITHUB_RUN_NUMBER ||
+    process.env.GITHUB_RUN_ID ||
+    "";
+
   const packageJson = await readRootPackageJson(startPath);
 
-  return generateVersionInfo(
-    refSlug,
-    refName,
-    shaShort,
-    packageJson.version,
-    buildId
-  );
+  return generateVersionInfo(refSlug, refName, packageJson.version, buildId);
 }
 
 /**
