@@ -21,6 +21,7 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end }}
+
 {{- end }}
 
 {{/*
@@ -58,6 +59,28 @@ Create the name of the service account to use
 {{- default (include "nodes.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
+Render optional Log4j environment variables when structured logging is enabled.
+*/}}
+{{- define "nodes.log4jEnv" -}}
+{{- if eq (default "plain" .Values.config.logFormat) "json" }}
+- name: LOG4J_CONFIGURATION_FILE
+  value: /etc/besu/log-config.xml
+{{- end }}
+{{- end }}
+
+{{/*
+Render optional volume mounts for the Log4j configuration file.
+*/}}
+{{- define "nodes.log4jVolumeMount" -}}
+{{- if eq (default "plain" .Values.config.logFormat) "json" }}
+- name: besu-config
+  mountPath: /etc/besu/log-config.xml
+  subPath: log-config.xml
+  readOnly: true
 {{- end }}
 {{- end }}
 

@@ -1,6 +1,6 @@
 # network-nodes
 
-![Version: 0.1.1](https://img.shields.io/badge/Version-0.1.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.1.1](https://img.shields.io/badge/Version-0.1.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.1](https://img.shields.io/badge/AppVersion-0.1.1-informational?style=flat-square)
 
 A Helm chart for Kubernetes
 
@@ -30,6 +30,7 @@ A Helm chart for Kubernetes
 | config.http.maxActiveConnections | int | `2000` | Maximum concurrent HTTP JSON-RPC connections. |
 | config.http.maxBatchSize | int | `512` | Maximum number of batched JSON-RPC calls per request. |
 | config.http.maxRequestContentLength | int | `524288000` | Maximum HTTP request body size in bytes. |
+| config.logFormat | string | `"plain"` | Log output format. Supports "plain" (default) or "json". |
 | config.logging | string | `"INFO"` | Log verbosity level for Besu components. |
 | config.metrics.categories | list | `["BLOCKCHAIN","ETHEREUM","EXECUTORS","JVM","NETWORK","PEERS","PROCESS","PRUNER","RPC","SYNCHRONIZER","TRANSACTION_POOL"]` | Metrics categories exposed to Prometheus. |
 | config.metrics.enabled | bool | `true` | Enable the Prometheus metrics endpoint. |

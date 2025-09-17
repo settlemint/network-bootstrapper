@@ -87,6 +87,8 @@ service:
 config:
   # -- (string) Log verbosity level for Besu components.
   logging: INFO
+  # -- (string) Log output format. Supports "plain" (default) or "json".
+  logFormat: plain
   # -- (string) Ledger storage backend (FOREST or BONSAI).
   dataStorageFormat: FOREST
   # -- (string) Filename containing each node's private key within mounted secrets.
