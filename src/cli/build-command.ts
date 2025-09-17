@@ -29,6 +29,7 @@ type CliOptions = {
   outputType?: OutputType;
   secondsPerBlock?: number;
   staticNodeDomain?: string;
+  staticNodeNamespace?: string;
   staticNodePort?: number;
   staticNodeDiscoveryPort?: number;
 };
@@ -110,22 +111,45 @@ const normalizeStaticNodeDomain = (
   return trimmed.length === 0 ? undefined : trimmed;
 };
 
+const normalizeStaticNodeNamespace = (
+  namespace: string | undefined
+): string | undefined => {
+  if (!namespace) {
+    return;
+  }
+
+  const trimmed = namespace.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+};
+
 const createStaticNodeEntries = (
   nodes: readonly IndexedNode[],
   {
+    namespace,
     domain,
     port,
     discoveryPort,
-  }: { domain?: string; port: number; discoveryPort: number }
+  }: {
+    namespace?: string;
+    domain?: string;
+    port: number;
+    discoveryPort: number;
+  }
 ): string[] => {
   const normalizedDomain = normalizeStaticNodeDomain(domain);
+  const normalizedNamespace = normalizeStaticNodeNamespace(namespace);
 
   return nodes.map((node) => {
     const podName = `besu-node-validator-${node.index}-0`;
     const serviceName = `besu-node-validator-${node.index}`;
-    const host = normalizedDomain
-      ? `${podName}.${serviceName}.${normalizedDomain}`
-      : podName;
+    const segments = [podName, serviceName];
+    if (normalizedNamespace) {
+      segments.push(normalizedNamespace);
+    }
+    if (normalizedDomain) {
+      segments.push(normalizedDomain);
+    }
+    const host = segments.join(".");
     const publicKey = node.publicKey.startsWith("0x")
       ? node.publicKey.slice(2)
       : node.publicKey;
@@ -151,6 +175,7 @@ const runBootstrap = async (
     secondsPerBlock,
     validators: validatorOption,
     staticNodeDomain: staticNodeDomainOption,
+    staticNodeNamespace: staticNodeNamespaceOption,
     staticNodePort: staticNodePortOption,
     staticNodeDiscoveryPort: staticNodeDiscoveryPortOption,
   } = options;
@@ -178,6 +203,7 @@ const runBootstrap = async (
   const validators = generateGroup(deps.factory, validatorsCount);
   const faucet = deps.factory.generate();
   const staticNodes = createStaticNodeEntries(validators, {
+    namespace: staticNodeNamespaceOption,
     domain: staticNodeDomainOption,
     port: staticNodePortOption ?? DEFAULT_STATIC_NODE_PORT,
     discoveryPort: staticNodeDiscoveryPortOption ?? DEFAULT_STATIC_NODE_PORT,
@@ -275,6 +301,11 @@ const createCliCommand = (
       (value: string) => stripSurroundingQuotes(value)
     )
     .option(
+      "--static-node-namespace <name>",
+      "Namespace segment inserted between service name and domain for static-nodes entries.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
       "--static-node-port <number>",
       "P2P port used for static-nodes enode URIs.",
       (value: string) => parsePositiveInteger(value, "Static node port"),
@@ -352,6 +383,10 @@ const createCliCommand = (
           cmd.getOptionValueSource("staticNodeDomain") === "default"
             ? undefined
             : options.staticNodeDomain,
+        staticNodeNamespace:
+          cmd.getOptionValueSource("staticNodeNamespace") === "default"
+            ? undefined
+            : options.staticNodeNamespace,
         staticNodePort:
           cmd.getOptionValueSource("staticNodePort") === "default"
             ? undefined
@@ -370,6 +405,9 @@ const createCliCommand = (
             : stripSurroundingQuotes(normalizedOptions.allocations),
         staticNodeDomain: normalizeStaticNodeDomain(
           normalizedOptions.staticNodeDomain
+        ),
+        staticNodeNamespace: normalizeStaticNodeNamespace(
+          normalizedOptions.staticNodeNamespace
         ),
       };
 

@@ -84,6 +84,10 @@ const HTTP_CONFLICT_STATUS = 409;
 const HTTP_INTERNAL_ERROR_STATUS = 500;
 const HTTP_SERVICE_UNAVAILABLE_STATUS = 503;
 const LEADING_DOT_REGEX = /^\./u;
+const DEFAULT_STATIC_NODE_PORT = 30_303;
+const DEFAULT_STATIC_NODE_DISCOVERY_PORT = 30_303;
+const SAMPLE_STATIC_DOMAIN = "svc.cluster.local";
+const SAMPLE_STATIC_NAMESPACE = "network";
 
 const sampleNode = (index: number): IndexedNode => {
   const hexValue = index.toString(HEX_RADIX);
@@ -103,18 +107,28 @@ const sampleNode = (index: number): IndexedNode => {
 const staticNodeUri = (
   node: IndexedNode,
   domain?: string,
-  port = 30_303,
-  discoveryPort = 30_303
+  port = DEFAULT_STATIC_NODE_PORT,
+  discoveryPort = DEFAULT_STATIC_NODE_DISCOVERY_PORT,
+  namespace?: string
 ): string => {
   const trimmedDomain =
     domain === undefined || domain.trim().length === 0
       ? undefined
       : domain.trim().replace(LEADING_DOT_REGEX, "");
+  const trimmedNamespace =
+    namespace === undefined || namespace.trim().length === 0
+      ? undefined
+      : namespace.trim();
   const podName = `besu-node-validator-${node.index}-0`;
   const serviceName = `besu-node-validator-${node.index}`;
-  const host = trimmedDomain
-    ? `${podName}.${serviceName}.${trimmedDomain}`
-    : podName;
+  const segments = [podName, serviceName];
+  if (trimmedNamespace) {
+    segments.push(trimmedNamespace);
+  }
+  if (trimmedDomain) {
+    segments.push(trimmedDomain);
+  }
+  const host = segments.join(".");
   const publicKey = node.publicKey.startsWith("0x")
     ? node.publicKey.slice(2)
     : node.publicKey;
@@ -128,7 +142,15 @@ const samplePayload: OutputPayload = {
   faucet: sampleFaucet,
   genesis: { config: { chainId: TEST_CHAIN_ID }, extraData: "0xabc" },
   validators: [sampleValidator],
-  staticNodes: [staticNodeUri(sampleValidator)],
+  staticNodes: [
+    staticNodeUri(
+      sampleValidator,
+      SAMPLE_STATIC_DOMAIN,
+      DEFAULT_STATIC_NODE_PORT,
+      DEFAULT_STATIC_NODE_DISCOVERY_PORT,
+      SAMPLE_STATIC_NAMESPACE
+    ),
+  ],
 };
 
 describe("outputResult", () => {

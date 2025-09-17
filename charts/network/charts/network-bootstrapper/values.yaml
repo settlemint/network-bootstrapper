@@ -87,16 +87,27 @@ tolerations: []
 # -- (object) Affinity and anti-affinity rules influencing pod placement.
 affinity: {}
 
+# -- (string) Kubernetes cluster DNS suffix. Used when staticNodeDomain is not explicitly provided.
+clusterDomain: svc.cluster.local
+
+# -- (int) Default P2P port for generated static node URIs when per-run settings are omitted.
+defaultStaticNodePort: 30303
+
+# -- (int) Default discovery port for generated static node URIs when per-run settings are omitted.
+defaultStaticNodeDiscoveryPort: 30303
+
 # -- (object) Network bootstrapper CLI settings translated into command-line flags.
 settings:
   # -- (int) Number of validator node definitions the bootstrapper generates. Default: 4.
   validators:
-  # -- (string) DNS suffix appended to static node hostnames (for example: "namespace.svc.cluster.local"). Default: null.
+  # -- (string) DNS suffix appended to static node hostnames (for example: "svc.cluster.local"). Default: `clusterDomain`.
   staticNodeDomain:
-  # -- (int) P2P port used in static node enode URIs. Default: 30303.
-  staticNodePort: 30303
-  # -- (int) Discovery port used in static node enode URIs. Default: 30303.
-  staticNodeDiscoveryPort: 30303
+  # -- (string) Namespace segment inserted between service and domain in static node hostnames. Default: release namespace.
+  staticNodeNamespace:
+  # -- (int) P2P port used in static node enode URIs. Default: `defaultStaticNodePort`.
+  staticNodePort:
+  # -- (int) Discovery port used in static node enode URIs. Default: `defaultStaticNodeDiscoveryPort`.
+  staticNodeDiscoveryPort:
   # -- (string) Filesystem path, accessible to the job, pointing to a JSON file with initial account allocations. Omit to skip pre-funded accounts.
   allocations:
   # -- (string) Destination for generated artefacts: `screen` (stdout), `file` (write to volume), or `kubernetes` (persist as Kubernetes secrets/configmaps). Default: "screen".

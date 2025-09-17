@@ -58,17 +58,27 @@ const expectedStaticNodeUri = (
   index: number,
   domain?: string,
   port: number = DEFAULT_STATIC_NODE_PORT,
-  discoveryPort: number = DEFAULT_STATIC_NODE_PORT
+  discoveryPort: number = DEFAULT_STATIC_NODE_PORT,
+  namespace?: string
 ): string => {
   const normalizedDomain =
     domain === undefined || domain.trim().length === 0
       ? undefined
       : domain.trim().replace(LEADING_DOT_REGEX, "");
+  const normalizedNamespace =
+    namespace === undefined || namespace.trim().length === 0
+      ? undefined
+      : namespace.trim();
   const podName = `besu-node-validator-${index}-0`;
   const serviceName = `besu-node-validator-${index}`;
-  const host = normalizedDomain
-    ? `${podName}.${serviceName}.${normalizedDomain}`
-    : podName;
+  const segments = [podName, serviceName];
+  if (normalizedNamespace) {
+    segments.push(normalizedNamespace);
+  }
+  if (normalizedDomain) {
+    segments.push(normalizedDomain);
+  }
+  const host = segments.join(".");
   const publicKey = expectedPublicKey(index).slice(2);
   return `enode://${publicKey}@${host}:${port}?discport=${discoveryPort}`;
 };
@@ -309,7 +319,9 @@ describe("CLI command bootstrap", () => {
         "--validators",
         "1",
         "--static-node-domain",
-        "network.svc.cluster.local",
+        "svc.cluster.local",
+        "--static-node-namespace",
+        "network",
         "--static-node-port",
         "40000",
         "--static-node-discovery-port",
@@ -321,9 +333,10 @@ describe("CLI command bootstrap", () => {
     expect(capturedPayload?.staticNodes).toEqual([
       expectedStaticNodeUri(
         1,
-        "network.svc.cluster.local",
+        "svc.cluster.local",
         CUSTOM_STATIC_NODE_PORT,
-        0
+        0,
+        "network"
       ),
     ]);
   });
@@ -362,7 +375,8 @@ describe("CLI command bootstrap", () => {
     await runBootstrap(
       {
         validators: 1,
-        staticNodeDomain: "network.svc.cluster.local",
+        staticNodeDomain: "svc.cluster.local",
+        staticNodeNamespace: "network",
         staticNodePort: CUSTOM_STATIC_NODE_PORT,
         staticNodeDiscoveryPort: 0,
       },
@@ -372,9 +386,10 @@ describe("CLI command bootstrap", () => {
     expect(capturedPayload?.staticNodes).toEqual([
       expectedStaticNodeUri(
         1,
-        "network.svc.cluster.local",
+        "svc.cluster.local",
         CUSTOM_STATIC_NODE_PORT,
-        0
+        0,
+        "network"
       ),
     ]);
   });

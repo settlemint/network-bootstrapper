@@ -127,6 +127,10 @@ spec:
               mountPath: /etc/besu/genesis.json
               subPath: genesis.json
               readOnly: true
+            - name: besu-static-nodes
+              mountPath: /etc/besu/static-nodes.json
+              subPath: static-nodes.json
+              readOnly: true
             - name: besu-private-key
               mountPath: {{ printf "/data/%s" $privateKeyFilename }}
               subPathExpr: "$(POD_NAME)/privateKey"
@@ -152,6 +156,9 @@ spec:
         - name: besu-genesis
           configMap:
             name: besu-genesis
+        - name: besu-static-nodes
+          configMap:
+            name: besu-static-nodes
         - name: besu-private-key
           projected:
             {{- if gt $validatorReplicaBudget 0 }}
