@@ -33,7 +33,7 @@ jobs:
       (github.event_name == 'pull_request' && github.event.action != 'closed') ||
       github.event_name == 'pull_request_review'
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
       issues: write
       security-events: write
@@ -136,9 +136,10 @@ jobs:
           commit_message: "chore(release): sync generated assets [skip ci]"
           branch: main
           file_pattern: 'package.json **/package.json charts/**/Chart.yaml charts/**/README.md README.md'
-          github_token: ${{ env.PAT_TOKEN }}
-          commit_author_name: 'SettleMint Release Bot'
-          commit_author_email: 'support@settlemint.com'
+          commit_user_name: 'SettleMint Release Bot'
+          commit_user_email: 'support@settlemint.com'
+        env:
+          GITHUB_TOKEN: ${{ env.PAT_TOKEN }}
 
       - name: Docker meta
         if: github.event_name == 'pull_request' || github.event_name == 'push'
