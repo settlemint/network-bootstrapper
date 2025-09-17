@@ -5,11 +5,7 @@ import type { BesuAllocAccount } from "../genesis/besu-genesis.service.ts";
 import { ALGORITHM } from "../genesis/besu-genesis.service.ts";
 import type { GeneratedNodeKey } from "../keys/node-key-factory.ts";
 import type { BootstrapDependencies, CliOptions } from "./build-command.ts";
-import {
-  __testing as buildCommandTesting,
-  createCliCommand,
-  runBootstrap,
-} from "./build-command.ts";
+import { createCliCommand, runBootstrap } from "./build-command.ts";
 import type { OutputPayload, OutputType } from "./output.ts";
 import { outputResult as realOutputResult } from "./output.ts";
 
@@ -344,25 +340,6 @@ describe("CLI command bootstrap", () => {
       command.parseAsync(["node", "cli", "--consensus", "invalid"])
     ).rejects.toThrow(
       `Consensus must be one of: ${Object.values(ALGORITHM).join(", ")}.`
-    );
-  });
-
-  test("parse helpers validate inputs", () => {
-    expect(buildCommandTesting.parsePositiveInteger("5", "Label")).toBe(5);
-    expect(buildCommandTesting.parseNonNegativeInteger("0", "Zero")).toBe(0);
-    expect(buildCommandTesting.parsePositiveBigInt("123", "Big")).toBe("123");
-
-    expect(() =>
-      buildCommandTesting.parsePositiveInteger("0", "Label")
-    ).toThrow("Label must be a positive integer.");
-    expect(() =>
-      buildCommandTesting.parseNonNegativeInteger("-1", "Zero")
-    ).toThrow("Zero must be a non-negative integer.");
-    expect(() => buildCommandTesting.parsePositiveBigInt("-5", "Big")).toThrow(
-      "Big must be a positive integer."
-    );
-    expect(() => buildCommandTesting.parsePositiveBigInt("not", "Big")).toThrow(
-      "Big must be a positive integer."
     );
   });
 });

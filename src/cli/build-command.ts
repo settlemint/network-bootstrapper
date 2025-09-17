@@ -238,8 +238,3 @@ const createCliCommand = (
 
 export type { BootstrapDependencies, CliOptions };
 export { createCliCommand, runBootstrap };
-export const __testing = {
-  parsePositiveInteger,
-  parseNonNegativeInteger,
-  parsePositiveBigInt,
-};

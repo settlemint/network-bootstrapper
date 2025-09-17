@@ -70,10 +70,25 @@ describe("CLI output", () => {
   });
 });
 
+const ADDRESS_HEX_LENGTH = 40;
+const PRIVATE_KEY_HEX_LENGTH = 64;
+const PUBLIC_KEY_HEX_LENGTH = 128;
+const HEX_RADIX = 16;
+const SAMPLE_VALIDATOR_INDEX = 1;
+const SAMPLE_RPC_INDEX = 2;
+const SAMPLE_FAUCET_INDEX = 99;
+const EXPECTED_CONFIGMAP_COUNT = 8;
+const TEST_CHAIN_ID = 1;
+const HTTP_CONFLICT_STATUS = 409;
+const HTTP_INTERNAL_ERROR_STATUS = 500;
+const HTTP_SERVICE_UNAVAILABLE_STATUS = 503;
+
 const sampleNode = (index: number): IndexedNode => {
-  const address = `0x${index.toString(16).padStart(40, "0")}` as `0x${string}`;
-  const keyHex = index.toString(16).padStart(64, "0");
-  const pubHex = index.toString(16).padStart(128, "0");
+  const hexValue = index.toString(HEX_RADIX);
+  const address =
+    `0x${hexValue.padStart(ADDRESS_HEX_LENGTH, "0")}` as `0x${string}`;
+  const keyHex = hexValue.padStart(PRIVATE_KEY_HEX_LENGTH, "0");
+  const pubHex = hexValue.padStart(PUBLIC_KEY_HEX_LENGTH, "0");
   return {
     index,
     address,
@@ -84,10 +99,10 @@ const sampleNode = (index: number): IndexedNode => {
 };
 
 const samplePayload: OutputPayload = {
-  faucet: sampleNode(99),
-  genesis: { config: { chainId: 1 }, extraData: "0xabc" },
-  rpcNodes: [sampleNode(2)],
-  validators: [sampleNode(1)],
+  faucet: sampleNode(SAMPLE_FAUCET_INDEX),
+  genesis: { config: { chainId: TEST_CHAIN_ID }, extraData: "0xabc" },
+  rpcNodes: [sampleNode(SAMPLE_RPC_INDEX)],
+  validators: [sampleNode(SAMPLE_VALIDATOR_INDEX)],
 };
 
 describe("outputResult", () => {
@@ -105,8 +120,12 @@ describe("outputResult", () => {
 
     const directories = await readdir("out");
     expect(directories.length).toBe(1);
-    const targetDir = join("out", directories[0]!);
-    const files = await readdir(targetDir);
+    const targetDir = directories[0];
+    if (!targetDir) {
+      throw new Error("expected compiled output directory");
+    }
+    const targetDirPath = join("out", targetDir);
+    const files = await readdir(targetDirPath);
     expect(files.sort()).toEqual(
       [
         "besu-faucet-address",
@@ -125,8 +144,11 @@ describe("outputResult", () => {
       ].sort()
     );
 
-    const genesisContent = await readFile(join(targetDir, "genesis"), "utf8");
-    expect(genesisContent).toContain('"chainId": 1');
+    const genesisContent = await readFile(
+      join(targetDirPath, "genesis"),
+      "utf8"
+    );
+    expect(genesisContent).toContain(`"chainId": ${TEST_CHAIN_ID}`);
 
     await rm("out", { recursive: true, force: true });
   });
@@ -145,20 +167,17 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {
-          // no-op for tests
+        function loadFromCluster(): void {
+          /* no-op for tests */
         };
 
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
-          listNamespacedConfigMap: async ({
-            namespace,
-          }: {
-            namespace: string;
-          }) => {
+          listNamespacedConfigMap: ({ namespace }: { namespace: string }) => {
             listedNamespaces.push(namespace);
+            return Promise.resolve();
           },
-          createNamespacedConfigMap: async ({
+          createNamespacedConfigMap: ({
             namespace,
             body,
           }: {
@@ -170,6 +189,7 @@ describe("outputResult", () => {
               name: body?.metadata?.name ?? "",
               data: body?.data ?? {},
             });
+            return Promise.resolve();
           },
         };
         return client as unknown as CoreV1Api;
@@ -177,13 +197,13 @@ describe("outputResult", () => {
 
       (Bun as any).file = () =>
         ({
-          text: async () => "test-namespace",
+          text: () => Promise.resolve("test-namespace"),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await outputResult("kubernetes", samplePayload);
 
       expect(listedNamespaces).toEqual(["test-namespace"]);
-      expect(created).toHaveLength(8);
+      expect(created).toHaveLength(EXPECTED_CONFIGMAP_COUNT);
       const names = created.map((entry) => entry.name).sort();
       expect(names).toContain("besu-node-validator-1-address");
       expect(names).toContain("besu-node-rpc-node-2-private-key");
@@ -201,16 +221,21 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {};
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
-          listNamespacedConfigMap: async () => {},
-          createNamespacedConfigMap: async () => {
-            const error = {
-              response: {
-                statusCode: 409,
-                body: { message: "already exists" },
-              },
+          listNamespacedConfigMap: () => Promise.resolve(),
+          createNamespacedConfigMap: () => {
+            const error = new Error("already exists");
+            (
+              error as {
+                response?: { statusCode: number; body: { message: string } };
+              }
+            ).response = {
+              statusCode: HTTP_CONFLICT_STATUS,
+              body: { message: "already exists" },
             };
             throw error;
           },
@@ -220,7 +245,7 @@ describe("outputResult", () => {
 
       (Bun as any).file = () =>
         ({
-          text: async () => "conflict-namespace",
+          text: () => Promise.resolve("conflict-namespace"),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
@@ -239,12 +264,12 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {
+        function loadFromCluster(): never {
           throw new Error("no cluster");
         };
       (Bun as any).file = () =>
         ({
-          text: async () => "ignored",
+          text: () => Promise.resolve("ignored"),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
@@ -263,13 +288,13 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {};
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
       (KubeConfig.prototype as any).makeApiClient = originalMake;
       (Bun as any).file = () =>
         ({
-          text: async () => {
-            throw new Error("unreadable");
-          },
+          text: () => Promise.reject(new Error("unreadable")),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
@@ -289,11 +314,13 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {};
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
       (KubeConfig.prototype as any).makeApiClient = originalMake;
       (Bun as any).file = () =>
         ({
-          text: async () => "  ",
+          text: () => Promise.resolve("  "),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
@@ -313,18 +340,18 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {};
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
-          listNamespacedConfigMap: async () => {
-            throw { message: "forbidden" };
-          },
+          listNamespacedConfigMap: () => Promise.reject(new Error("forbidden")),
         };
         return client as unknown as CoreV1Api;
       };
       (Bun as any).file = () =>
         ({
-          text: async () => "ns",
+          text: () => Promise.resolve("ns"),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
@@ -344,19 +371,21 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {};
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
-          listNamespacedConfigMap: async () => {},
-          createNamespacedConfigMap: async () => {
-            throw "boom";
+          listNamespacedConfigMap: () => Promise.resolve(),
+          createNamespacedConfigMap: () => {
+            throw new Error("boom");
           },
         };
         return client as unknown as CoreV1Api;
       };
       (Bun as any).file = () =>
         ({
-          text: async () => "ns",
+          text: () => Promise.resolve("ns"),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
@@ -376,12 +405,16 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {};
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
-          listNamespacedConfigMap: async () => {},
-          createNamespacedConfigMap: async () => {
-            const error = { statusCode: 500, message: "failed" };
+          listNamespacedConfigMap: () => Promise.resolve(),
+          createNamespacedConfigMap: () => {
+            const error = new Error("failed");
+            (error as { statusCode?: number }).statusCode =
+              HTTP_INTERNAL_ERROR_STATUS;
             throw error;
           },
         };
@@ -389,7 +422,7 @@ describe("outputResult", () => {
       };
       (Bun as any).file = () =>
         ({
-          text: async () => "ns",
+          text: () => Promise.resolve("ns"),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
@@ -409,19 +442,26 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {};
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
-          listNamespacedConfigMap: async () => {},
-          createNamespacedConfigMap: async () => {
-            throw { response: { status: 503 } };
+          listNamespacedConfigMap: () => Promise.resolve(),
+          createNamespacedConfigMap: () => {
+            const error = new Error("response error");
+            Object.defineProperty(error, "message", { value: undefined });
+            (error as { response?: { status: number } }).response = {
+              status: HTTP_SERVICE_UNAVAILABLE_STATUS,
+            };
+            throw error;
           },
         };
         return client as unknown as CoreV1Api;
       };
       (Bun as any).file = () =>
         ({
-          text: async () => "ns",
+          text: () => Promise.resolve("ns"),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
@@ -441,19 +481,26 @@ describe("outputResult", () => {
 
     try {
       (KubeConfig.prototype as any).loadFromCluster =
-        function loadFromCluster() {};
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
       (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
         const client = {
-          listNamespacedConfigMap: async () => {},
-          createNamespacedConfigMap: async () => {
-            throw { body: { message: "denied" } };
+          listNamespacedConfigMap: () => Promise.resolve(),
+          createNamespacedConfigMap: () => {
+            const error = new Error("body error");
+            Object.defineProperty(error, "message", { value: undefined });
+            (error as { body?: { message: string } }).body = {
+              message: "denied",
+            };
+            throw error;
           },
         };
         return client as unknown as CoreV1Api;
       };
       (Bun as any).file = () =>
         ({
-          text: async () => "ns",
+          text: () => Promise.resolve("ns"),
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(

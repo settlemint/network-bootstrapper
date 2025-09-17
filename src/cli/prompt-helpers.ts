@@ -181,7 +181,3 @@ export {
   promptForCount,
   promptForInteger,
 };
-export const __testing = {
-  toCount,
-  ensureNotAborted,
-};

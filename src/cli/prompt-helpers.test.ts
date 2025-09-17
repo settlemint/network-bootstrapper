@@ -6,7 +6,6 @@ import {
   promptForBigIntString,
   promptForCount,
   promptForInteger,
-  __testing as promptHelpersTesting,
 } from "./prompt-helpers.ts";
 
 const PROVIDED_RESULT = 7;
@@ -15,6 +14,8 @@ const PROMPT_VALUE = "5";
 const INVALID_VALUE = "not-a-number";
 const VALID_COUNT_INPUT = "3";
 const VALID_COUNT_EXPECTED = 3;
+const INTEGER_DEFAULT = 4;
+const MINIMUM_INTEGER = 1;
 
 const stubInput = (responses: string[]) => {
   let index = 0;
@@ -89,13 +90,13 @@ describe("prompt helpers", () => {
   test("promptForInteger falls back to default after invalid input", async () => {
     const responses = ["not-a-number", "0", "", "7"];
     const result = await promptForInteger({
-      defaultValue: 4,
+      defaultValue: INTEGER_DEFAULT,
       labelText: "Example",
       message: "Example",
-      min: 1,
+      min: MINIMUM_INTEGER,
       prompt: stubInput(responses),
     });
-    expect(result).toBe(4);
+    expect(result).toBe(INTEGER_DEFAULT);
   });
 
   test("promptForBigIntString enforces positive integers", async () => {
@@ -112,23 +113,12 @@ describe("prompt helpers", () => {
   test("promptForInteger aborts when sentinel provided", async () => {
     await expect(
       promptForInteger({
-        defaultValue: 1,
+        defaultValue: MINIMUM_INTEGER,
         labelText: "Abort",
         message: "Abort",
-        min: 1,
+        min: MINIMUM_INTEGER,
         prompt: stubInput([ABORT_OPTION]),
       })
     ).rejects.toThrow(`Abort aborted via ${ABORT_OPTION}.`);
-  });
-
-  test("internal helpers validate values", () => {
-    expect(promptHelpersTesting.toCount("5")).toBe(5);
-    expect(promptHelpersTesting.toCount("-1")).toBeUndefined();
-    expect(() =>
-      promptHelpersTesting.ensureNotAborted(ABORT_OPTION, "Test")
-    ).toThrow(`Test aborted via ${ABORT_OPTION}.`);
-    expect(promptHelpersTesting.ensureNotAborted("value", "Test")).toBe(
-      "value"
-    );
   });
 });

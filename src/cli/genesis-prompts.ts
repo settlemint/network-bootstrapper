@@ -239,8 +239,3 @@ export type {
   GenesisPromptPreset,
 };
 export { promptForGenesisConfig };
-export const __testing = {
-  ensurePositiveInteger,
-  ensureNonNegativeInteger,
-  ensurePositiveBigIntString,
-};

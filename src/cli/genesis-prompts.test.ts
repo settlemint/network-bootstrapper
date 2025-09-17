@@ -8,7 +8,6 @@ import {
   type BesuGenesisService,
 } from "../genesis/besu-genesis.service.ts";
 import {
-  __testing as genesisTesting,
   type HexAddress,
   type PromptOverrides,
   promptForGenesisConfig,
@@ -24,6 +23,9 @@ const SECOND_CHAIN_ID = 1;
 const SECOND_BLOCK_TIME = 2;
 const EVM_STACK_SIZE = 4096;
 const CONTRACT_SIZE_LIMIT = 10_000;
+const NEGATIVE_PRESET_INT = -1;
+const NEGATIVE_BIG_VALUE = "-1";
+const NON_NUMERIC_BIG_VALUE = "not-a-number";
 
 const withCancel = <T>(value: T) => {
   const promise = Promise.resolve(value) as Promise<T> & { cancel: () => void };
@@ -250,12 +252,12 @@ describe("promptForGenesisConfig", () => {
         faucetAddress: faucet,
         preset: {
           algorithm: ALGORITHM.IBFTv2,
-          chainId: -1,
-          secondsPerBlock: -2,
-          gasLimit: "-5",
-          gasPrice: -1,
-          evmStackSize: -3,
-          contractSizeLimit: -4,
+          chainId: NEGATIVE_PRESET_INT,
+          secondsPerBlock: NEGATIVE_PRESET_INT,
+          gasLimit: NEGATIVE_BIG_VALUE,
+          gasPrice: NEGATIVE_PRESET_INT,
+          evmStackSize: NEGATIVE_PRESET_INT,
+          contractSizeLimit: NEGATIVE_PRESET_INT,
         },
         validatorAddresses: validators,
       })
@@ -273,7 +275,7 @@ describe("promptForGenesisConfig", () => {
           chainId: 1,
           secondsPerBlock: 1,
           gasLimit: "1000",
-          gasPrice: -1,
+          gasPrice: NEGATIVE_PRESET_INT,
           evmStackSize: 2048,
           contractSizeLimit: 100_000,
         },
@@ -312,7 +314,7 @@ describe("promptForGenesisConfig", () => {
           algorithm: ALGORITHM.IBFTv2,
           chainId: 1,
           secondsPerBlock: 1,
-          gasLimit: "not-a-number",
+          gasLimit: NON_NUMERIC_BIG_VALUE,
           gasPrice: 0,
           evmStackSize: 2048,
           contractSizeLimit: 100_000,
@@ -320,24 +322,5 @@ describe("promptForGenesisConfig", () => {
         validatorAddresses: validators,
       })
     ).rejects.toThrow("Gas limit must be a positive integer.");
-  });
-
-  test("ensure helpers validate preset values", () => {
-    expect(genesisTesting.ensurePositiveInteger(5, "Value")).toBe(5);
-    expect(genesisTesting.ensureNonNegativeInteger(0, "Zero")).toBe(0);
-    expect(genesisTesting.ensurePositiveBigIntString("100", "Big")).toBe("100");
-
-    expect(() => genesisTesting.ensurePositiveInteger(0, "Value")).toThrow(
-      "Value must be a positive integer."
-    );
-    expect(() => genesisTesting.ensureNonNegativeInteger(-1, "Zero")).toThrow(
-      "Zero must be a non-negative integer."
-    );
-    expect(() => genesisTesting.ensurePositiveBigIntString("0", "Big")).toThrow(
-      "Big must be a positive integer."
-    );
-    expect(() =>
-      genesisTesting.ensurePositiveBigIntString("bad", "Big")
-    ).toThrow("Big must be a positive integer.");
   });
 });
