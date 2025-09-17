@@ -1,6 +1,3 @@
-# Default values for nodes.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
 
 # This sets the replica count for the StatefulSet more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
 rpcReplicaCount: 2

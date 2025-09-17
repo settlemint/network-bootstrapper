@@ -28,7 +28,6 @@ spec:
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
   {{- $validatorReplicaBudget := .Values.validatorReplicaCount | int }}
-  podManagementPolicy: Parallel
   replicas: {{ .Values.validatorReplicaCount }}
   serviceName: {{ include "nodes.fullname" . }}
   {{- if and $useClaimTemplate (or (ne $whenDeleted "") (ne $whenScaled "")) }}
