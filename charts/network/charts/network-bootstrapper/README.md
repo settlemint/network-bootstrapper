@@ -1,6 +1,6 @@
 # network-bootstrapper
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.1.1](https://img.shields.io/badge/Version-0.1.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A Helm chart for Kubernetes
 
@@ -27,6 +27,7 @@ A Helm chart for Kubernetes
 | image.repository | string | `"ghcr.io/settlemint/network-bootstrapper"` | OCI registry path hosting the network bootstrapper image. |
 | image.tag | string | `""` | Image tag override; leave empty to inherit the chart appVersion. |
 | imagePullSecrets | list | `[]` | Image pull secrets enabling access to private registries. |
+| initContainers | list|string | `[]` | Init containers executed before the bootstrapper container starts. |
 | nameOverride | string | `""` | Override for the short release name used by name templates. |
 | nodeSelector | object | `{}` |  |
 | podAnnotations | object | `{}` |  |

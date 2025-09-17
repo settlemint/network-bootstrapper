@@ -109,3 +109,20 @@ Resolve the number of validator replicas, falling back to global overrides when 
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Render init container specifications provided via values.
+Accepts either a YAML string or a list of init container maps and indents output appropriately.
+*/}}
+{{- define "nodes.renderInitContainers" -}}
+{{- $ctx := .context -}}
+{{- $containers := .containers -}}
+{{- $indent := .indent | default 2 -}}
+{{- if $containers -}}
+{{- if kindIs "string" $containers -}}
+{{ tpl $containers $ctx | nindent $indent }}
+{{- else -}}
+{{ tpl (toYaml $containers) $ctx | nindent $indent }}
+{{- end -}}
+{{- end -}}
+{{- end -}}

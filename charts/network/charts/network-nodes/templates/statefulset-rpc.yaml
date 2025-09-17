@@ -28,6 +28,9 @@ spec:
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
   {{- $rpcReplicaBudget := .Values.rpcReplicaCount | int }}
+  {{- $initContainers := .Values.initContainers | default (dict) }}
+  {{- $sharedInitContainers := get $initContainers "shared" }}
+  {{- $rpcInitContainers := get $initContainers "rpc" }}
   podManagementPolicy: Parallel
   replicas: {{ .Values.rpcReplicaCount }}
   serviceName: {{ include "nodes.fullname" . }}-rpc
@@ -65,6 +68,11 @@ spec:
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or $sharedInitContainers $rpcInitContainers }}
+      initContainers:
+{{- include "nodes.renderInitContainers" (dict "context" $root "containers" $sharedInitContainers "indent" 8) }}
+{{- include "nodes.renderInitContainers" (dict "context" $root "containers" $rpcInitContainers "indent" 8) }}
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}

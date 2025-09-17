@@ -410,6 +410,64 @@ volumeMounts: []
 #   mountPath: "/etc/foo"
 #   readOnly: true
 
+# Init containers executed before Besu containers start.
+initContainers:
+  # -- (list|string) Init containers applied to both validator and RPC pods.
+  shared: []
+  # - name: install-plugins
+  #   image: busybox:1.36
+  #   command:
+  #     - sh
+  #     - -c
+  #   args:
+  #     - >-
+  #       cp /extensions/*.jar /data/plugins && chmod 644 /data/plugins/*.jar
+  #   env:
+  #     - name: BESU_LOG
+  #       value: DEBUG
+  #   envFrom:
+  #     - configMapRef:
+  #         name: besu-env
+  #   volumeMounts:
+  #     - name: data
+  #       mountPath: /data
+  #   resources:
+  #     requests:
+  #       cpu: 75m
+  #       memory: 128Mi
+  #   securityContext:
+  #     runAsNonRoot: true
+  #   workingDir: /work
+  #   stdin: false
+  #   tty: false
+  # -- (list|string) Additional init containers exclusively for validator pods.
+  validator: []
+  # - name: wait-for-bootstrapper
+  #   image: busybox:1.36
+  #   command:
+  #     - sh
+  #     - -c
+  #   args:
+  #     - >-
+  #       until nslookup bootstrapper.{{ .Release.Namespace }}.svc.cluster.local; do echo "waiting"; sleep 3; done
+  #   resources:
+  #     limits:
+  #       cpu: 25m
+  #       memory: 32Mi
+  # -- (list|string) Additional init containers exclusively for RPC pods.
+  rpc: []
+  # - name: warm-cache
+  #   image: curlimages/curl:8.10.1
+  #   command:
+  #     - sh
+  #     - -c
+  #   args:
+  #     - curl -sf http://metadata/config && echo "cache primed"
+  #   resources:
+  #     requests:
+  #       cpu: 25m
+  #       memory: 32Mi
+
 # Node selector constraints influencing where Besu pods can schedule.
 nodeSelector: {}
 
