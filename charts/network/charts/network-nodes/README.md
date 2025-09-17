@@ -119,10 +119,10 @@ A Helm chart for Kubernetes
 | podLabels | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
 | readinessProbe.failureThreshold | int | `3` | Consecutive failures required before the pod is considered unready. |
-| readinessProbe.httpGet.path | string | `"/readiness?minPeers=0&maxBlocksBehind=100"` | HTTP path used for readiness probing, including peer/sync thresholds. |
+| readinessProbe.httpGet.path | string | `"/readiness?minPeers=1&maxBlocksBehind=100"` | HTTP path used for readiness probing, including peer/sync thresholds. |
 | readinessProbe.httpGet.port | string|int | `"json-rpc"` | Target container port serving the readiness endpoint. |
 | readinessProbe.initialDelaySeconds | int | `15` | Seconds to wait before starting readiness checks. |
-| readinessProbe.periodSeconds | int | `10` | Frequency of readiness checks in seconds. |
+| readinessProbe.periodSeconds | int | `5` | Frequency of readiness checks in seconds. |
 | readinessProbe.timeoutSeconds | int | `2` | Timeout in seconds before marking the probe as failed. |
 | resources | object | `{}` |  |
 | rpcReplicaCount | int | `2` | Number of RPC node replicas provisioned via StatefulSet. |
