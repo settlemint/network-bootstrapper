@@ -3,8 +3,8 @@
 # -- (int) Number of RPC node replicas provisioned via StatefulSet.
 rpcReplicaCount: 2
 
-# -- (int) Number of validator node replicas participating in consensus.
-validatorReplicaCount: 4
+# -- (int) Number of validator node replicas participating in consensus. Leave unset to derive from global.validatorReplicaCount.
+validatorReplicaCount:
 
 # Container image configuration shared by validator and RPC pods.
 image:
