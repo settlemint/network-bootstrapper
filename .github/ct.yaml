@@ -3,3 +3,4 @@ chart-dirs:
 remote: origin
 target-branch: main
 helm-extra-args: '--wait --timeout 600s'
+lint-conf: .github/lintconf.yaml
