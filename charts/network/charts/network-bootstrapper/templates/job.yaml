@@ -1,3 +1,5 @@
+{{- $artifactSource := default "generated" .Values.artifacts.source -}}
+{{- if eq $artifactSource "generated" }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -106,3 +108,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- end }}

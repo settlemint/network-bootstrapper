@@ -121,3 +121,22 @@ settings:
   evmStackSize:
   # -- (int) Maximum smart-contract bytecode size accepted by the EVM.
   contractSizeLimit:
+
+# Artifact sourcing controls for bootstrap data used by the nodes chart.
+artifacts:
+  # -- (string) Determines how Besu network artifacts are populated. Use `generated` to run the job or `external` to supply values manually.
+  source: generated
+  external:
+    # -- (object) Besu genesis document rendered into the `besu-genesis` ConfigMap when `source` equals `external`.
+    genesis: {}
+    # -- (list) Collection of enode URIs persisted to the `besu-static-nodes` ConfigMap when `source` equals `external`.
+    staticNodes: []
+    # -- (list) Validator node definitions providing the data expected by the nodes chart. Each entry must include `address`, `publicKey`, `privateKey`, and `enode`.
+    validators: []
+    faucet:
+      # -- (string) Faucet account address stored in the `besu-faucet-address` ConfigMap when `source` equals `external`.
+      address: ""
+      # -- (string) Faucet account public key stored in the `besu-faucet-pubkey` ConfigMap when `source` equals `external`.
+      publicKey: ""
+      # -- (string) Faucet private key stored in the `besu-faucet-private-key` Secret when `source` equals `external`.
+      privateKey: ""

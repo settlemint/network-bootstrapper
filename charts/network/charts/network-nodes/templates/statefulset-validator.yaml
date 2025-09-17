@@ -27,8 +27,8 @@ spec:
   {{- $useClaimTemplate := and $persistenceEnabled (not $useExistingClaim) }}
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
-  {{- $validatorReplicaBudget := .Values.validatorReplicaCount | int }}
-  replicas: {{ .Values.validatorReplicaCount }}
+  {{- $validatorReplicaBudget := (include "nodes.validatorReplicaCount" . | int) }}
+  replicas: {{ $validatorReplicaBudget }}
   serviceName: {{ include "nodes.fullname" . }}
   {{- if and $useClaimTemplate (or (ne $whenDeleted "") (ne $whenScaled "")) }}
   persistentVolumeClaimRetentionPolicy:

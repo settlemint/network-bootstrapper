@@ -136,6 +136,6 @@ A Helm chart for Kubernetes
 | serviceAccount.create | bool | `true` | Create a ServiceAccount resource automatically for the release. |
 | serviceAccount.name | string | `""` | Existing ServiceAccount name to reuse when creation is disabled. |
 | tolerations | list | `[]` | Tolerations allowing pods to run on nodes with matching taints. |
-| validatorReplicaCount | int | `4` | Number of validator node replicas participating in consensus. |
+| validatorReplicaCount | int | `nil` | Number of validator node replicas participating in consensus. Leave unset to derive from global.validatorReplicaCount. |
 | volumeMounts | list | `[]` | Additional volume mounts applied to Besu containers. |
 | volumes | list | `[]` | Extra volumes attached to Besu pods for custom configuration or secrets. |
