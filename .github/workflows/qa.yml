@@ -131,7 +131,7 @@ jobs:
       # Commit generated version metadata and README updates on release tags
       - name: Auto-commit release assets
         if: github.event_name == 'push' && steps.version.outputs.tag == 'latest'
-        uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 # v5
+        uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 # v6
         with:
           commit_message: "chore(release): sync generated assets [skip ci]"
           branch: main
