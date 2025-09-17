@@ -89,7 +89,7 @@ A Helm chart for Kubernetes
 | config.ws.host | string | `"0.0.0.0"` |  |
 | config.ws.maxActiveConnections | int | `2000` |  |
 | config.ws.maxFrameSize | int | `2097152` |  |
-| fullnameOverride | string | `""` |  |
+| fullnameOverride | string | `"besu-node"` |  |
 | httpRoute | object | `{"annotations":{},"enabled":false,"hostnames":["chart-example.local"],"parentRefs":[{"name":"gateway","sectionName":"http"}],"rules":[{"matches":[{"path":{"type":"PathPrefix","value":"/headers"}}]}]}` | Expose the service via gateway-api HTTPRoute Requires Gateway API resources and suitable controller installed within the cluster (see: https://gateway-api.sigs.k8s.io/guides/) |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"docker.io/hyperledger/besu"` |  |
