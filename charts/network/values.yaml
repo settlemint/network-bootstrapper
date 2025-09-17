@@ -5,9 +5,9 @@ global:
   # -- (object) Defaults consumed by Besu network node workloads.
   networkNodes:
     # -- (string) Kubernetes Service name fronting validator pods to align bootstrapper static-nodes output.
-    serviceName: besu-node
+    serviceName: ""
     # -- (string) StatefulSet prefix used for validator pod hostnames.
-    podPrefix: besu-node-validator
+    podPrefix: ""
     # -- (string) ConfigMap name storing the generated genesis.json artifact.
     genesisConfigMapName: besu-genesis
     # -- (string) ConfigMap name storing static-nodes.json entries.
