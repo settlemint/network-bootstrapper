@@ -27,12 +27,13 @@ spec:
   {{- $useClaimTemplate := and $persistenceEnabled (not $useExistingClaim) }}
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
-  {{- $validatorReplicaBudget := .Values.validatorReplicaCount | int }}
+<<<<<<< HEAD
   {{- $globalNodes := .Values.global.networkNodes | default (dict) }}
   {{- $genesisConfigMapName := default "besu-genesis" (get $globalNodes "genesisConfigMapName") }}
   {{- $staticNodesConfigMapName := default "besu-static-nodes" (get $globalNodes "staticNodesConfigMapName") }}
   {{- $validatorPodPrefix := default "besu-node-validator" (get $globalNodes "podPrefix") }}
-  replicas: {{ .Values.validatorReplicaCount }}
+  {{- $validatorReplicaBudget := (include "nodes.validatorReplicaCount" . | int) }}
+  replicas: {{ $validatorReplicaBudget }}
   serviceName: {{ include "nodes.fullname" . }}
   {{- if and $useClaimTemplate (or (ne $whenDeleted "") (ne $whenScaled "")) }}
   persistentVolumeClaimRetentionPolicy:
