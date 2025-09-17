@@ -6,6 +6,19 @@ Generate node identities, configure consensus, and emit a Besu genesis.
 
 The helm chart to run this on Kubernetes / OpenShift can be found [here](./charts/network-bootstrapper/README.md)
 
+### Install from GitHub Pages
+
+The published chart repository lives at `https://settlemint.github.io/network-bootstrapper/`. Add it to Helm, sync indexes, and install the `network` chart:
+
+```bash
+helm repo add network-bootstrapper https://settlemint.github.io/network-bootstrapper/
+helm repo update
+
+helm upgrade --install besu-network network-bootstrapper/network \
+  --namespace besu \
+  --create-namespace
+```
+
 ### Deployment modes
 
 Two deployment paths are supported: fully auto-generated artefacts or supplying your own genesis/static peers while sourcing node keys from an external secret store such as Conjur.
