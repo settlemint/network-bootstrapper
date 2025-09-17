@@ -126,7 +126,7 @@ jobs:
 
       - name: Run docs
         if: github.event_name == 'pull_request' || github.event_name == 'push'
-        run: bun run docs:helm
+        run: bun run docs:helm && bun run docs:cli
 
       # Commit generated version metadata and README updates on release tags
       - name: Auto-commit release assets
@@ -135,7 +135,7 @@ jobs:
         with:
           commit_message: "chore(release): sync generated assets [skip ci]"
           branch: main
-          file_pattern: 'package.json **/package.json charts/**/Chart.yaml charts/**/README.md README.md'
+          file_pattern: 'package.json charts/**/Chart.yaml charts/**/README.md README.md'
           commit_user_name: 'SettleMint Release Bot'
           commit_user_email: 'support@settlemint.com'
         env:
