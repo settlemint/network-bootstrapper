@@ -45,6 +45,12 @@ spec:
             {{- $resolvedStaticDomain := default $clusterDomain .Values.settings.staticNodeDomain }}
             {{- $resolvedStaticPort := default $defaultStaticPort .Values.settings.staticNodePort }}
             {{- $resolvedStaticDiscovery := default $defaultStaticDiscovery .Values.settings.staticNodeDiscoveryPort }}
+            {{- $globalNodes := default (dict) .Values.global.networkNodes }}
+            {{- $resolvedServiceName := default "besu-node" (default (get $globalNodes "serviceName") .Values.settings.staticNodeServiceName) }}
+            {{- $resolvedPodPrefix := default (printf "%s-validator" $resolvedServiceName) (default (get $globalNodes "podPrefix") .Values.settings.staticNodePodPrefix) }}
+            {{- $resolvedGenesisName := default "besu-genesis" (default (get $globalNodes "genesisConfigMapName") .Values.settings.genesisConfigMapName) }}
+            {{- $resolvedStaticNodesName := default "besu-static-nodes" (default (get $globalNodes "staticNodesConfigMapName") .Values.settings.staticNodesConfigMapName) }}
+            {{- $resolvedFaucetPrefix := default "besu-faucet" (default (get $globalNodes "faucetArtifactPrefix") .Values.settings.faucetArtifactPrefix) }}
             {{- with .Values.settings.validators }}
             - --validators={{ . }}
             {{- end }}
@@ -54,6 +60,11 @@ spec:
             {{- end }}
             - --static-node-port={{ $resolvedStaticPort }}
             - --static-node-discovery-port={{ $resolvedStaticDiscovery }}
+            - --static-node-service-name={{ $resolvedServiceName }}
+            - --static-node-pod-prefix={{ $resolvedPodPrefix }}
+            - --genesis-configmap-name={{ $resolvedGenesisName }}
+            - --static-nodes-configmap-name={{ $resolvedStaticNodesName }}
+            - --faucet-artifact-prefix={{ $resolvedFaucetPrefix }}
             {{- with .Values.settings.allocations }}
             - --allocations={{ . }}
             {{- end }}

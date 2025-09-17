@@ -1,1 +1,14 @@
 # This parent chart does not define additional values; override subchart defaults here when packaging composite releases.
+
+global:
+  networkNodes:
+    # Default Kubernetes Service name fronting validator pods; customise to keep bootstrapper outputs in sync with node manifests.
+    serviceName: besu-node
+    # Default StatefulSet prefix used for validator pod hostnames.
+    podPrefix: besu-node-validator
+    # Default ConfigMap name storing the generated genesis.json artifact.
+    genesisConfigMapName: besu-genesis
+    # Default ConfigMap name storing static-nodes.json entries.
+    staticNodesConfigMapName: besu-static-nodes
+    # Default prefix used for faucet ConfigMaps and Secrets.
+    faucetArtifactPrefix: besu-faucet

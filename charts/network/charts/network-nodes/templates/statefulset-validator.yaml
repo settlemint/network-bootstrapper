@@ -28,6 +28,10 @@ spec:
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
   {{- $validatorReplicaBudget := .Values.validatorReplicaCount | int }}
+  {{- $globalNodes := .Values.global.networkNodes | default (dict) }}
+  {{- $genesisConfigMapName := default "besu-genesis" (get $globalNodes "genesisConfigMapName") }}
+  {{- $staticNodesConfigMapName := default "besu-static-nodes" (get $globalNodes "staticNodesConfigMapName") }}
+  {{- $validatorPodPrefix := default "besu-node-validator" (get $globalNodes "podPrefix") }}
   replicas: {{ .Values.validatorReplicaCount }}
   serviceName: {{ include "nodes.fullname" . }}
   {{- if and $useClaimTemplate (or (ne $whenDeleted "") (ne $whenScaled "")) }}
@@ -164,17 +168,17 @@ spec:
             name: {{ include "nodes.fullname" . }}-config
         - name: besu-genesis
           configMap:
-            name: besu-genesis
+            name: {{ $genesisConfigMapName }}
         - name: besu-static-nodes
           configMap:
-            name: besu-static-nodes
+            name: {{ $staticNodesConfigMapName }}
         - name: besu-private-key
           projected:
             {{- if gt $validatorReplicaBudget 0 }}
             sources:
               {{- range $i, $_ := until $validatorReplicaBudget }}
               - secret:
-                  name: {{ printf "besu-node-validator-%d-private-key" $i }}
+                  name: {{ printf "%s-%d-private-key" $validatorPodPrefix $i }}
                   items:
                     - key: privateKey
                       path: {{ printf "%s-validator-%d/privateKey" (include "nodes.fullname" $root) $i }}

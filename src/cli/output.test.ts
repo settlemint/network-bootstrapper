@@ -86,6 +86,11 @@ const HTTP_SERVICE_UNAVAILABLE_STATUS = 503;
 const LEADING_DOT_REGEX = /^\./u;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
 const DEFAULT_STATIC_NODE_DISCOVERY_PORT = 30_303;
+const DEFAULT_SERVICE_NAME = "besu-node";
+const DEFAULT_POD_PREFIX = "besu-node-validator";
+const DEFAULT_GENESIS_CONFIGMAP_NAME = "besu-genesis";
+const DEFAULT_STATIC_NODES_CONFIGMAP_NAME = "besu-static-nodes";
+const DEFAULT_FAUCET_PREFIX = "besu-faucet";
 const SAMPLE_STATIC_DOMAIN = "svc.cluster.local";
 const SAMPLE_STATIC_NAMESPACE = "network";
 const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
@@ -111,7 +116,9 @@ const staticNodeUri = (
   domain?: string,
   port = DEFAULT_STATIC_NODE_PORT,
   discoveryPort = DEFAULT_STATIC_NODE_DISCOVERY_PORT,
-  namespace?: string
+  namespace?: string,
+  serviceName: string = DEFAULT_SERVICE_NAME,
+  podPrefix: string = DEFAULT_POD_PREFIX
 ): string => {
   const trimmedDomain =
     domain === undefined || domain.trim().length === 0
@@ -122,8 +129,7 @@ const staticNodeUri = (
       ? undefined
       : namespace.trim();
   const ordinal = node.index - 1;
-  const podName = `besu-node-validator-${ordinal}`;
-  const serviceName = "besu-node";
+  const podName = `${podPrefix}-${ordinal}`;
   const segments = [podName, serviceName];
   if (trimmedNamespace) {
     segments.push(trimmedNamespace);
@@ -159,6 +165,12 @@ const samplePayload: OutputPayload = {
       SAMPLE_STATIC_NAMESPACE
     ),
   ],
+  artifactNames: {
+    faucetPrefix: DEFAULT_FAUCET_PREFIX,
+    validatorPrefix: DEFAULT_POD_PREFIX,
+    genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
+    staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+  },
 };
 
 describe("outputResult", () => {
@@ -193,19 +205,19 @@ describe("outputResult", () => {
         "besu-node-validator-0-enode",
         "besu-node-validator-0-private-key",
         "besu-node-validator-0-pubkey",
-        "genesis",
-        "static-nodes.json",
+        "besu-genesis.json",
+        "besu-static-nodes.json",
       ].sort()
     );
 
     const genesisContent = await readFile(
-      join(targetDirPath, "genesis"),
+      join(targetDirPath, "besu-genesis.json"),
       "utf8"
     );
     expect(genesisContent).toContain(`"chainId": ${TEST_CHAIN_ID}`);
 
     const staticNodesContent = await readFile(
-      join(targetDirPath, "static-nodes.json"),
+      join(targetDirPath, "besu-static-nodes.json"),
       "utf8"
     );
     expect(JSON.parse(staticNodesContent)).toEqual(samplePayload.staticNodes);
@@ -313,6 +325,77 @@ describe("outputResult", () => {
       expect(
         JSON.parse(staticNodesConfig?.data?.["static-nodes.json"] ?? "[]")
       ).toEqual(samplePayload.staticNodes);
+    } finally {
+      (KubeConfig.prototype as any).loadFromCluster = originalLoad;
+      (KubeConfig.prototype as any).makeApiClient = originalMake;
+      (Bun as any).file = originalFile;
+    }
+  });
+
+  test("kubernetes output respects custom artifact names", async () => {
+    const originalLoad = (KubeConfig.prototype as any).loadFromCluster;
+    const originalMake = (KubeConfig.prototype as any).makeApiClient;
+    const originalFile = (Bun as any).file;
+
+    const createdConfigMaps: { name: string }[] = [];
+    const createdSecrets: { name: string }[] = [];
+
+    try {
+      (KubeConfig.prototype as any).loadFromCluster =
+        function loadFromCluster(): void {
+          /* no-op for tests */
+        };
+      (KubeConfig.prototype as any).makeApiClient = function makeApiClient() {
+        const client = {
+          listNamespacedConfigMap: () => Promise.resolve(),
+          listNamespacedSecret: () => Promise.resolve(),
+          createNamespacedConfigMap: ({ body }: { body: any }) => {
+            createdConfigMaps.push({ name: body?.metadata?.name ?? "" });
+            return Promise.resolve();
+          },
+          createNamespacedSecret: ({ body }: { body: any }) => {
+            createdSecrets.push({ name: body?.metadata?.name ?? "" });
+            return Promise.resolve();
+          },
+        };
+        return client as unknown as CoreV1Api;
+      };
+      (Bun as any).file = () =>
+        ({
+          text: () => Promise.resolve("custom-namespace"),
+        }) as unknown as ReturnType<typeof Bun.file>;
+
+      const payload: OutputPayload = {
+        ...samplePayload,
+        artifactNames: {
+          faucetPrefix: "custom-faucet",
+          validatorPrefix: "custom-validator",
+          genesisConfigMapName: "custom-genesis",
+          staticNodesConfigMapName: "custom-static",
+        },
+        staticNodes: [
+          staticNodeUri(
+            sampleValidator,
+            SAMPLE_STATIC_DOMAIN,
+            DEFAULT_STATIC_NODE_PORT,
+            DEFAULT_STATIC_NODE_DISCOVERY_PORT,
+            SAMPLE_STATIC_NAMESPACE,
+            "custom-service",
+            "custom-validator"
+          ),
+        ],
+      };
+
+      await outputResult("kubernetes", payload);
+
+      const mapNames = createdConfigMaps.map((entry) => entry.name).sort();
+      expect(mapNames).toContain("custom-genesis");
+      expect(mapNames).toContain("custom-static");
+      expect(mapNames).toContain("custom-validator-0-address");
+      expect(mapNames).toContain("custom-faucet-address");
+      const secretNames = createdSecrets.map((entry) => entry.name).sort();
+      expect(secretNames).toContain("custom-faucet-private-key");
+      expect(secretNames).toContain("custom-validator-0-private-key");
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
       (KubeConfig.prototype as any).makeApiClient = originalMake;

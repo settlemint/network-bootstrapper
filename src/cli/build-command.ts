@@ -14,7 +14,11 @@ import {
   type OutputPayload,
   type OutputType,
 } from "./output.ts";
-import { createCountParser, promptForCount } from "./prompt-helpers.ts";
+import {
+  createCountParser,
+  promptForCount,
+  promptForText,
+} from "./prompt-helpers.ts";
 
 type CliOptions = {
   allocations?: string;
@@ -32,12 +36,18 @@ type CliOptions = {
   staticNodeNamespace?: string;
   staticNodePort?: number;
   staticNodeDiscoveryPort?: number;
+  staticNodeServiceName?: string;
+  staticNodePodPrefix?: string;
+  genesisConfigmapName?: string;
+  staticNodesConfigmapName?: string;
+  faucetArtifactPrefix?: string;
 };
 
 type BootstrapDependencies = {
   factory: NodeKeyFactory;
   promptForCount: typeof promptForCount;
   promptForGenesis: typeof promptForGenesisConfig;
+  promptForText: typeof promptForText;
   service: BesuGenesisService;
   loadAllocations: typeof loadAllocations;
   outputResult: (type: OutputType, payload: OutputPayload) => Promise<void>;
@@ -45,6 +55,11 @@ type BootstrapDependencies = {
 
 const DEFAULT_VALIDATOR_COUNT = 4;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
+const DEFAULT_STATIC_NODE_SERVICE_NAME = "besu-node";
+const DEFAULT_STATIC_NODE_POD_PREFIX = "besu-node-validator";
+const DEFAULT_GENESIS_CONFIGMAP_NAME = "besu-genesis";
+const DEFAULT_STATIC_NODES_CONFIGMAP_NAME = "besu-static-nodes";
+const DEFAULT_FAUCET_ARTIFACT_PREFIX = "besu-faucet";
 const OUTPUT_CHOICES: OutputType[] = ["screen", "file", "kubernetes"];
 const LEADING_DOT_REGEX = /^\./u;
 const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
@@ -140,24 +155,30 @@ const createStaticNodeEntries = (
   {
     namespace,
     domain,
+    serviceName,
+    podPrefix,
     port,
     discoveryPort,
   }: {
     namespace?: string;
     domain?: string;
+    serviceName: string;
+    podPrefix: string;
     port: number;
     discoveryPort: number;
   }
 ): string[] => {
   const normalizedDomain = normalizeStaticNodeDomain(domain);
   const normalizedNamespace = normalizeStaticNodeNamespace(namespace);
+  const hostServiceName =
+    normalizeStaticNodeNamespace(serviceName) ?? serviceName;
+  const podNamePrefix = normalizeStaticNodeNamespace(podPrefix) ?? podPrefix;
 
   return nodes.map((node) => {
     // StatefulSet pod ordinals start at 0 even though our generator indexes start at 1.
     const ordinal = node.index - 1;
-    const podName = `besu-node-validator-${ordinal}`;
-    const serviceName = "besu-node"; // Headless service fronting validator pods
-    const segments = [podName, serviceName];
+    const podName = `${podNamePrefix}-${ordinal}`;
+    const segments = [podName, hostServiceName];
     if (normalizedNamespace) {
       segments.push(normalizedNamespace);
     }
@@ -191,6 +212,11 @@ const runBootstrap = async (
     staticNodeNamespace: staticNodeNamespaceOption,
     staticNodePort: staticNodePortOption,
     staticNodeDiscoveryPort: staticNodeDiscoveryPortOption,
+    staticNodeServiceName: staticNodeServiceNameOption,
+    staticNodePodPrefix: staticNodePodPrefixOption,
+    genesisConfigmapName: genesisConfigmapNameOption,
+    staticNodesConfigmapName: staticNodesConfigmapNameOption,
+    faucetArtifactPrefix: faucetArtifactPrefixOption,
   } = options;
 
   const resolveCount = (
@@ -207,10 +233,60 @@ const runBootstrap = async (
     return deps.promptForCount(label, undefined, defaultValue);
   };
 
+  const resolveText = async (
+    label: string,
+    provided: string | undefined,
+    defaultValue: string
+  ): Promise<string> => {
+    if (provided && provided.trim().length > 0) {
+      return provided.trim();
+    }
+    if (acceptDefaults) {
+      return defaultValue;
+    }
+    const response = await deps.promptForText({
+      defaultValue,
+      labelText: label,
+      message: label,
+    });
+    const trimmed = response.trim();
+    return trimmed.length === 0 ? defaultValue : trimmed;
+  };
+
   const validatorsCount = await resolveCount(
     "validator nodes",
     validatorOption,
     DEFAULT_VALIDATOR_COUNT
+  );
+
+  const staticNodeServiceName = await resolveText(
+    "Static node service name",
+    staticNodeServiceNameOption,
+    DEFAULT_STATIC_NODE_SERVICE_NAME
+  );
+
+  const staticNodePodPrefix = await resolveText(
+    "Static node pod prefix",
+    staticNodePodPrefixOption,
+    DEFAULT_STATIC_NODE_POD_PREFIX
+  );
+
+  const genesisConfigMapName = await resolveText(
+    "Genesis ConfigMap name",
+    genesisConfigmapNameOption,
+    DEFAULT_GENESIS_CONFIGMAP_NAME
+  );
+
+  const staticNodesConfigMapName = await resolveText(
+    "Static nodes ConfigMap name",
+    staticNodesConfigmapNameOption,
+    DEFAULT_STATIC_NODES_CONFIGMAP_NAME
+  );
+
+  const faucetArtifactPrefix = await resolveText(
+    "Faucet artifact prefix",
+    faucetArtifactPrefixOption,
+    DEFAULT_FAUCET_ARTIFACT_PREFIX
   );
 
   const validators = generateGroup(deps.factory, validatorsCount);
@@ -218,6 +294,8 @@ const runBootstrap = async (
   const staticNodes = createStaticNodeEntries(validators, {
     namespace: staticNodeNamespaceOption,
     domain: staticNodeDomainOption,
+    serviceName: staticNodeServiceName,
+    podPrefix: staticNodePodPrefix,
     port: staticNodePortOption ?? DEFAULT_STATIC_NODE_PORT,
     discoveryPort: staticNodeDiscoveryPortOption ?? DEFAULT_STATIC_NODE_PORT,
   });
@@ -251,6 +329,12 @@ const runBootstrap = async (
     genesis,
     validators,
     staticNodes,
+    artifactNames: {
+      faucetPrefix: faucetArtifactPrefix,
+      validatorPrefix: staticNodePodPrefix,
+      genesisConfigMapName,
+      staticNodesConfigMapName,
+    },
   };
 
   await deps.outputResult(outputType ?? "screen", payload);
@@ -260,6 +344,7 @@ const runBootstrap = async (
 const defaultDependencies: BootstrapDependencies = {
   factory: new NodeKeyFactory(),
   promptForCount,
+  promptForText,
   promptForGenesis: promptForGenesisConfig,
   service: new BesuGenesisService(),
   loadAllocations,
@@ -330,6 +415,31 @@ const createCliCommand = (
       (value: string) =>
         parseNonNegativeInteger(value, "Static node discovery port"),
       DEFAULT_STATIC_NODE_PORT
+    )
+    .option(
+      "--static-node-service-name <name>",
+      "Headless Service name used when constructing static-nodes hostnames.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
+      "--static-node-pod-prefix <prefix>",
+      "StatefulSet prefix used when constructing validator pod hostnames.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
+      "--genesis-configmap-name <name>",
+      "ConfigMap name that stores the generated genesis.json payload.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
+      "--static-nodes-configmap-name <name>",
+      "ConfigMap name that stores the generated static-nodes.json payload.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
+      "--faucet-artifact-prefix <prefix>",
+      "Prefix applied to faucet ConfigMaps and Secrets.",
+      (value: string) => stripSurroundingQuotes(value)
     )
     .option(
       "--consensus <algorithm>",
@@ -408,6 +518,26 @@ const createCliCommand = (
           cmd.getOptionValueSource("staticNodeDiscoveryPort") === "default"
             ? undefined
             : options.staticNodeDiscoveryPort,
+        staticNodeServiceName:
+          cmd.getOptionValueSource("staticNodeServiceName") === "default"
+            ? undefined
+            : options.staticNodeServiceName,
+        staticNodePodPrefix:
+          cmd.getOptionValueSource("staticNodePodPrefix") === "default"
+            ? undefined
+            : options.staticNodePodPrefix,
+        genesisConfigmapName:
+          cmd.getOptionValueSource("genesisConfigmapName") === "default"
+            ? undefined
+            : options.genesisConfigmapName,
+        staticNodesConfigmapName:
+          cmd.getOptionValueSource("staticNodesConfigmapName") === "default"
+            ? undefined
+            : options.staticNodesConfigmapName,
+        faucetArtifactPrefix:
+          cmd.getOptionValueSource("faucetArtifactPrefix") === "default"
+            ? undefined
+            : options.faucetArtifactPrefix,
       };
 
       const sanitizedOptions: CliOptions = {
@@ -422,6 +552,28 @@ const createCliCommand = (
         staticNodeNamespace: normalizeStaticNodeNamespace(
           normalizedOptions.staticNodeNamespace
         ),
+        staticNodeServiceName:
+          normalizedOptions.staticNodeServiceName === undefined
+            ? undefined
+            : stripSurroundingQuotes(normalizedOptions.staticNodeServiceName),
+        staticNodePodPrefix:
+          normalizedOptions.staticNodePodPrefix === undefined
+            ? undefined
+            : stripSurroundingQuotes(normalizedOptions.staticNodePodPrefix),
+        genesisConfigmapName:
+          normalizedOptions.genesisConfigmapName === undefined
+            ? undefined
+            : stripSurroundingQuotes(normalizedOptions.genesisConfigmapName),
+        staticNodesConfigmapName:
+          normalizedOptions.staticNodesConfigmapName === undefined
+            ? undefined
+            : stripSurroundingQuotes(
+                normalizedOptions.staticNodesConfigmapName
+              ),
+        faucetArtifactPrefix:
+          normalizedOptions.faucetArtifactPrefix === undefined
+            ? undefined
+            : stripSurroundingQuotes(normalizedOptions.faucetArtifactPrefix),
       };
 
       await runBootstrap(sanitizedOptions, deps);

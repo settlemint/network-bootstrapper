@@ -17,3 +17,12 @@ A Helm chart for a blockchain network on Kubernetes
 |  | network-bootstrapper | * |
 |  | network-nodes | * |
 
+## Values
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| global.networkNodes.faucetArtifactPrefix | string | `"besu-faucet"` |  |
+| global.networkNodes.genesisConfigMapName | string | `"besu-genesis"` |  |
+| global.networkNodes.podPrefix | string | `"besu-node-validator"` |  |
+| global.networkNodes.serviceName | string | `"besu-node"` |  |
+| global.networkNodes.staticNodesConfigMapName | string | `"besu-static-nodes"` |  |

@@ -7,6 +7,9 @@ metadata:
     app.kubernetes.io/component: rpc
 spec:
   {{- $root := . }}
+  {{- $globalNodes := .Values.global.networkNodes | default (dict) }}
+  {{- $genesisConfigMapName := default "besu-genesis" (get $globalNodes "genesisConfigMapName") }}
+  {{- $staticNodesConfigMapName := default "besu-static-nodes" (get $globalNodes "staticNodesConfigMapName") }}
   {{- $persistence := .Values.persistence | default (dict) }}
   {{- $persistenceEnabled := default false (get $persistence "enabled") }}
   {{- $existingClaim := default "" (get $persistence "existingClaim") }}
@@ -161,10 +164,10 @@ spec:
             name: {{ include "nodes.fullname" . }}-config
         - name: besu-genesis
           configMap:
-            name: besu-genesis
+            name: {{ $genesisConfigMapName }}
         - name: besu-static-nodes
           configMap:
-            name: besu-static-nodes
+            name: {{ $staticNodesConfigMapName }}
         {{- if $useExistingClaim }}
         - name: {{ $volumeName }}
           persistentVolumeClaim:
