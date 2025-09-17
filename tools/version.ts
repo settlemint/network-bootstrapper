@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { appendFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { Glob } from "bun";
 import { parse, stringify } from "yaml";
@@ -241,10 +242,14 @@ function updateChartDependencies(
  * @param startPath - Starting path for finding package.json files (defaults to current working directory)
  * @returns Promise that resolves when all updates are complete
  */
-export async function updatePackageVersion(startPath?: string): Promise<void> {
+export async function updatePackageVersion(
+  startPath?: string,
+  versionInfoOverride?: VersionInfo
+): Promise<void> {
   try {
     // Get the current version info
-    const versionInfo = await getVersionInfo({ startPath });
+    const versionInfo =
+      versionInfoOverride ?? (await getVersionInfo({ startPath }));
     const newVersion = versionInfo.version;
 
     console.log(`Updating all package.json files to version: ${newVersion}`);
@@ -365,10 +370,12 @@ export async function updatePackageVersion(startPath?: string): Promise<void> {
 /**
  * Updates all Chart.yaml files in the ATK directory with the current version
  */
-async function updateChartVersions(): Promise<void> {
+async function updateChartVersions(
+  versionInfoOverride?: VersionInfo
+): Promise<void> {
   try {
     // Get the current version info
-    const versionInfo = await getVersionInfo();
+    const versionInfo = versionInfoOverride ?? (await getVersionInfo());
     const newVersion = versionInfo.version;
 
     console.log(`Updating charts to version: ${newVersion}`);
@@ -465,6 +472,35 @@ async function updateChartVersions(): Promise<void> {
   }
 }
 
+/**
+ * Exports version and tag information to GitHub Outputs/Env for downstream steps
+ */
+async function persistGithubContext(versionInfo: VersionInfo): Promise<void> {
+  const { version, tag } = versionInfo;
+
+  const appendLines = async (
+    filePath: string | undefined,
+    lines: string[]
+  ): Promise<void> => {
+    if (!filePath || lines.length === 0) {
+      return;
+    }
+
+    const content = `${lines.join("\n")}\n`;
+    await appendFile(filePath, content, "utf8");
+  };
+
+  await appendLines(process.env.GITHUB_OUTPUT, [
+    `version=${version}`,
+    `tag=${tag}`,
+  ]);
+
+  await appendLines(process.env.GITHUB_ENV, [
+    `NETWORK_BOOTSTRAPPER_VERSION=${version}`,
+    `NETWORK_BOOTSTRAPPER_TAG=${tag}`,
+  ]);
+}
+
 // Run the script if called directly
 if (import.meta.main) {
   // Check if running in CI environment
@@ -473,6 +509,9 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  await updateChartVersions();
-  await updatePackageVersion();
+  const versionInfo = await getVersionInfo();
+
+  await updateChartVersions(versionInfo);
+  await updatePackageVersion(undefined, versionInfo);
+  await persistGithubContext(versionInfo);
 }

@@ -121,6 +121,7 @@ jobs:
         run: bun typecheck
 
       - name: Set version
+        id: version
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         run: bun run tools/version.ts
 
@@ -143,6 +144,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha
+            type=raw,value=${{ steps.version.outputs.version }}
 
       - name: Build and push
         if: github.event_name == 'pull_request' || github.event_name == 'push'
