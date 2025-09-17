@@ -208,11 +208,11 @@ jobs:
       - name: Configure Namespace access
         if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
         id: nscloud
-        uses: namespacelabs/nscloud-setup@v0
+        uses: namespacelabs/nscloud-setup@d1c625762f7c926a54bd39252efff0705fd11c64 # v0
 
       - name: Provision Namespace Kubernetes cluster
         if: (github.event_name == 'pull_request' || github.event_name == 'push') && steps.ct-changed.outputs.changed == 'true'
-        uses: namespacelabs/nscloud-cluster-action@v0
+        uses: namespacelabs/nscloud-cluster-action@d70b1e2b5ba0fa700698d8af8b331177df9ad4f6 # v0
         with:
           wait-kube-system: "true"
           machine-shape: "4x16"
