@@ -172,7 +172,7 @@ spec:
             sources:
               {{- range $i, $_ := until $validatorReplicaBudget }}
               - secret:
-                  name: {{ printf "besu-node-validator-%d-private-key" (add $i 1) }}
+                  name: {{ printf "besu-node-validator-%d-private-key" $i }}
                   items:
                     - key: privateKey
                       path: {{ printf "%s-validator-%d/privateKey" (include "nodes.fullname" $root) $i }}

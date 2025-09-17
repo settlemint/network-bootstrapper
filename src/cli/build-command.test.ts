@@ -71,8 +71,9 @@ const expectedStaticNodeUri = (
     namespace === undefined || namespace.trim().length === 0
       ? undefined
       : namespace.trim();
-  const podName = `besu-node-validator-${index}-0`;
-  const serviceName = `besu-node-validator-${index}`;
+  const ordinal = index - 1;
+  const podName = `besu-node-validator-${ordinal}`;
+  const serviceName = "besu-node-validator";
   const segments = [podName, serviceName];
   if (normalizedNamespace) {
     segments.push(normalizedNamespace);

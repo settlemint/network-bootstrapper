@@ -177,7 +177,9 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
 
 const createValidatorSpecs = (nodes: readonly IndexedNode[]): ConfigMapSpec[] =>
   nodes.flatMap<ConfigMapSpec>((node) => {
-    const base = `besu-node-validator-${node.index}`;
+    // Align artifact names with 0-indexed StatefulSet pod ordinals.
+    const ordinal = node.index - 1;
+    const base = `besu-node-validator-${ordinal}`;
     return [
       { name: `${base}-address`, key: "address", value: node.address },
       {

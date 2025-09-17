@@ -153,8 +153,10 @@ const createStaticNodeEntries = (
   const normalizedNamespace = normalizeStaticNodeNamespace(namespace);
 
   return nodes.map((node) => {
-    const podName = `besu-node-validator-${node.index}-0`;
-    const serviceName = `besu-node-validator-${node.index}`;
+    // StatefulSet pod ordinals start at 0 even though our generator indexes start at 1.
+    const ordinal = node.index - 1;
+    const podName = `besu-node-validator-${ordinal}`;
+    const serviceName = "besu-node-validator";
     const segments = [podName, serviceName];
     if (normalizedNamespace) {
       segments.push(normalizedNamespace);
