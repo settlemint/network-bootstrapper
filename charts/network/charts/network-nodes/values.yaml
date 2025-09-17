@@ -1,51 +1,58 @@
-
-# This sets the replica count for the StatefulSet more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+# rpcReplicaCount sets the number of RPC StatefulSet replicas that serve JSON-RPC traffic.
 rpcReplicaCount: 2
-# RPC pods expect Secrets named `besu-node-rpc-node-<n>-private-key` (1-indexed) to exist for private key mounts.
-# Validator pods expect Secrets named `besu-node-validator-<n>-private-key` (0-indexed).
+
+# validatorReplicaCount sets the number of validator StatefulSet replicas responsible for consensus.
 validatorReplicaCount: 4
 
-# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
+# image configures the Besu container image used for both RPC and validator pods.
 image:
+  # image.repository points at the OCI registry location containing the Besu image.
   repository: docker.io/hyperledger/besu
-  # This sets the pull policy for images.
+  # image.pullPolicy determines when Kubernetes attempts to re-pull the image layers.
   pullPolicy: IfNotPresent
+  # image.tag pins the Besu version; update to consume a different upstream release.
   tag: "25.8.0"
 
-# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+# imagePullSecrets lists Docker registry credentials needed to pull the Besu image.
 imagePullSecrets: []
-# This is to override the chart name.
+
+# nameOverride replaces the short chart name used in resource name templates.
 nameOverride: ""
+
+# fullnameOverride replaces the fully qualified release name used for resource naming.
 fullnameOverride: "besu-node"
 
-# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+# serviceAccount configures the Kubernetes ServiceAccount bound to pods created by this chart.
 serviceAccount:
-  # Specifies whether a service account should be created
+  # serviceAccount.create controls whether the chart should create a ServiceAccount automatically.
   create: true
-  # Automatically mount a ServiceAccount's API credentials?
+  # serviceAccount.automount controls whether pods receive a projected ServiceAccount token.
   automount: true
-  # Annotations to add to the service account
+  # serviceAccount.annotations attaches metadata annotations to the ServiceAccount object.
   annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
+  # serviceAccount.name references an existing ServiceAccount when creation is disabled.
   name: ""
 
-# This is for setting Kubernetes Annotations to a Pod.
-# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-# Defaults ensure Prometheus can scrape Besu's metrics endpoint without extra overrides.
+# podAnnotations applies metadata annotations to every Besu pod (validators and RPC nodes).
 podAnnotations:
+  # podAnnotations.prometheus.io/scrape enables Prometheus autoscraping of Besu metrics.
   prometheus.io/scrape: "true"
+  # podAnnotations.prometheus.io/path identifies the HTTP path exposing metrics.
   prometheus.io/path: /metrics
+  # podAnnotations.prometheus.io/port sets the metrics port label consumed by the scraper.
   prometheus.io/port: "9545"
+  # podAnnotations.prometheus.io/scheme selects the HTTP scheme used to scrape metrics.
   prometheus.io/scheme: http
-# This is for setting Kubernetes Labels to a Pod.
-# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+
+# podLabels applies extra Kubernetes labels to every Besu pod for selection or organisation.
 podLabels: {}
 
+# podSecurityContext defines pod-level Linux security settings shared by all containers in a pod.
 podSecurityContext:
   {}
   # fsGroup: 2000
 
+# securityContext defines container-level security controls for the Besu process.
 securityContext:
   {}
   # capabilities:
@@ -55,51 +62,89 @@ securityContext:
   # runAsNonRoot: true
   # runAsUser: 1000
 
-# This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+# service defines the Kubernetes Service exposing Besu endpoints.
 service:
-  # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+  # service.type selects the Service controller type (ClusterIP, NodePort, LoadBalancer, etc.).
   type: ClusterIP
-  # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
+  # service.ports maps friendly names to Service ports for Besu endpoints.
   ports:
+    # service.ports.rpc exposes the HTTP JSON-RPC interface.
     rpc: 8545
+    # service.ports.ws exposes the WebSocket JSON-RPC interface.
     ws: 8546
+    # service.ports.graphql exposes the GraphQL API.
     graphql: 8547
+    # service.ports.rlpx exposes the peer-to-peer RLPx TCP port.
     rlpx: 30303
+    # service.ports.discovery exposes the peer discovery UDP port.
     discovery: 30303
+    # service.ports.metrics exposes the Prometheus metrics endpoint.
     metrics: 9545
 
+# config captures the default besu.conf values applied to both validator and RPC nodes.
 config:
+  # config.logging controls the global logging verbosity for Besu.
   logging: INFO
+  # config.dataStorageFormat selects the ledger storage backend (FOREST or BONSAI).
   dataStorageFormat: FOREST
+  # config.privateKeyFilename names the file containing the node's private key inside mounted secrets.
   privateKeyFilename: privateKey
+  # config.bonsaiLimitTrieLogsEnabled toggles Bonsai limit trie logging for debugging state transitions.
   bonsaiLimitTrieLogsEnabled: false
+  # config.cacheLastBlocks specifies how many recent blocks are cached for quick access.
   cacheLastBlocks: 1024
+  # config.minGasPrice sets the minimum gas price accepted for transactions.
   minGasPrice: 0
+  # config.txPool configures the transaction pool behaviour.
   txPool:
+    # config.txPool.type selects the transaction ordering algorithm (e.g., FIFO, SEQUENCED).
     type: SEQUENCED
+    # config.txPool.maxSize limits the total number of transactions kept in the pool.
     maxSize: 100000
+    # config.txPool.noLocalPriority disables automatic prioritisation of locally submitted transactions.
     noLocalPriority: true
+    # config.txPool.limitByAccountPercentage caps per-account transaction contribution.
     limitByAccountPercentage: 1
+    # config.txPool.enableSaveRestore enables persistence of the transaction pool across restarts.
     enableSaveRestore: true
+  # config.p2p configures peer-to-peer networking parameters.
   p2p:
+    # config.p2p.enabled toggles the Besu peer-to-peer subsystem.
     enabled: true
+    # config.p2p.discoveryEnabled controls participation in peer discovery.
     discoveryEnabled: true
+    # config.p2p.staticNodesFile points to the static nodes JSON file mounted from ConfigMaps.
     staticNodesFile: "/etc/besu/static-nodes.json"
+    # config.p2p.interface binds the network interface for P2P sockets.
     interface: "0.0.0.0"
+    # config.p2p.maxPeers caps the number of simultaneous peer connections.
     maxPeers: 25
+  # config.rpc holds RPC subsystem configuration shared by HTTP and WebSocket servers.
   rpc:
+    # config.rpc.txFeecap limits the fee per gas for RPC-submitted transactions (0 disables the cap).
     txFeecap: 0
+  # config.sync configures chain synchronisation behaviour.
   sync:
+    # config.sync.minPeers defines the minimum peers required before commencing sync.
     minPeers: 1
+    # config.sync.mode selects the synchronisation mode (e.g., FULL, FAST, SNAP).
     mode: FULL
+  # config.remoteConnectionsLimitEnabled toggles limiting simultaneous remote JSON-RPC connections.
   remoteConnectionsLimitEnabled: false
+  # config.randomPeerPriorityEnabled shuffles peer priority to avoid fixed ordering bias.
   randomPeerPriorityEnabled: true
+  # config.receiptCompactionEnabled compacts receipt storage to save disk space.
   receiptCompactionEnabled: true
+  # config.hostAllowlist enumerates hosts authorised to reach the HTTP/WS RPC endpoints.
   hostAllowlist:
     - "*"
+  # config.http configures the HTTP JSON-RPC server.
   http:
+    # config.http.enabled toggles the HTTP JSON-RPC listener.
     enabled: true
+    # config.http.host binds the HTTP JSON-RPC listener interface.
     host: "0.0.0.0"
+    # config.http.api lists the JSON-RPC API namespaces enabled over HTTP.
     api:
       - DEBUG
       - ETH
@@ -112,15 +157,24 @@ config:
       - PERM
       - TXPOOL
       - PLUGINS
+    # config.http.corsOrigins enumerates allowed CORS origins for HTTP requests.
     corsOrigins:
       - all
+    # config.http.authenticationEnabled toggles JWT authentication for HTTP requests.
     authenticationEnabled: false
+    # config.http.maxActiveConnections limits concurrent HTTP connections.
     maxActiveConnections: 2000
+    # config.http.maxRequestContentLength caps the HTTP body size in bytes.
     maxRequestContentLength: 524288000
+    # config.http.maxBatchSize limits the number of JSON-RPC requests permitted in a single batch.
     maxBatchSize: 512
+  # config.ws configures the WebSocket JSON-RPC server.
   ws:
+    # config.ws.enabled toggles the WebSocket JSON-RPC listener.
     enabled: true
+    # config.ws.host binds the WebSocket listener interface.
     host: "0.0.0.0"
+    # config.ws.api lists the JSON-RPC API namespaces enabled over WebSockets.
     api:
       - DEBUG
       - ETH
@@ -133,17 +187,28 @@ config:
       - PERM
       - TXPOOL
       - PLUGINS
+    # config.ws.authenticationEnabled toggles JWT authentication for WebSocket requests.
     authenticationEnabled: false
+    # config.ws.maxActiveConnections limits concurrent WebSocket connections.
     maxActiveConnections: 2000
+    # config.ws.maxFrameSize caps the maximum WebSocket frame size in bytes.
     maxFrameSize: 2097152
+  # config.graphql configures the optional GraphQL endpoint.
   graphql:
+    # config.graphql.enabled toggles the GraphQL server.
     enabled: true
+    # config.graphql.host binds the GraphQL server interface.
     host: "0.0.0.0"
+    # config.graphql.corsOrigins lists allowed origins for GraphQL requests.
     corsOrigins:
       - all
+  # config.metrics configures the Prometheus metrics subsystem.
   metrics:
+    # config.metrics.enabled toggles the Prometheus metrics exporter.
     enabled: true
+    # config.metrics.host binds the metrics endpoint interface.
     host: "0.0.0.0"
+    # config.metrics.categories lists the metrics categories exposed.
     categories:
       - BLOCKCHAIN
       - ETHEREUM
@@ -156,93 +221,97 @@ config:
       - RPC
       - SYNCHRONIZER
       - TRANSACTION_POOL
+  # config.revertReasonEnabled toggles inclusion of revert reasons in RPC responses.
   revertReasonEnabled: true
 
-# This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
+# ingress configures Kubernetes Ingress resources for publicly exposing RPC services.
 ingress:
+  # ingress.enabled toggles creation of an Ingress resource.
   enabled: false
+  # ingress.className sets the ingressClassName field for controller selection.
   className: ""
+  # ingress.annotations attaches metadata annotations for ingress controllers.
   annotations:
     {}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
+  # ingress.hosts lists host/path routing rules for the Ingress.
   hosts:
     - host: chart-example.local
       paths:
         - path: /
           pathType: ImplementationSpecific
+  # ingress.tls defines TLS secrets and hostnames for HTTPS termination.
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:
   #      - chart-example.local
 
-# -- Expose the service via gateway-api HTTPRoute
-# Requires Gateway API resources and suitable controller installed within the cluster
-# (see: https://gateway-api.sigs.k8s.io/guides/)
+# httpRoute configures Gateway API HTTPRoute resources used with Gateway controllers.
 httpRoute:
-  # HTTPRoute enabled.
+  # httpRoute.enabled toggles rendering of an HTTPRoute resource.
   enabled: false
-  # HTTPRoute annotations.
+  # httpRoute.annotations applies annotations to the HTTPRoute manifest.
   annotations: {}
-  # Which Gateways this Route is attached to.
+  # httpRoute.parentRefs lists Gateway references that should attach this route.
   parentRefs:
     - name: gateway
       sectionName: http
       # namespace: default
-  # Hostnames matching HTTP header.
+  # httpRoute.hostnames enumerates HTTP hostnames matched by the route.
   hostnames:
     - chart-example.local
-  # List of rules and filters applied.
+  # httpRoute.rules defines match and filter blocks evaluated by the Gateway.
   rules:
     - matches:
         - path:
             type: PathPrefix
             value: /headers
-  #   filters:
-  #   - type: RequestHeaderModifier
-  #     requestHeaderModifier:
-  #       set:
-  #       - name: My-Overwrite-Header
-  #         value: this-is-the-only-value
-  #       remove:
-  #       - User-Agent
-  # - matches:
-  #   - path:
-  #       type: PathPrefix
-  #       value: /echo
-  #     headers:
-  #     - name: version
-  #       value: v2
+    # filters can be enabled to mutate headers or traffic characteristics.
+    # - type: RequestHeaderModifier
+    #   requestHeaderModifier:
+    #     set:
+    #       - name: My-Overwrite-Header
+    #         value: this-is-the-only-value
+    #     remove:
+    #       - User-Agent
+    # Additional matches can be added as needed.
+    # - matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /echo
+    #       headers:
+    #         - name: version
+    #           value: v2
 
-# -- Expose the service via OpenShift Route when running on OpenShift clusters
-#     This relies on the OpenShift router to make the network nodes reachable externally.
+# openShiftRoute configures an OpenShift Route for clusters running the OpenShift router.
 openShiftRoute:
+  # openShiftRoute.enabled toggles creation of the Route resource.
   enabled: false
-  # Route annotations transmitted to the OpenShift router.
+  # openShiftRoute.annotations attaches metadata annotations for the Route.
   annotations: {}
-  # Custom host name for the route. Leave empty to let the cluster allocate one.
+  # openShiftRoute.host enforces a specific hostname; leave empty for automatic allocation.
   host: ""
-  # Optional path to scope traffic.
+  # openShiftRoute.path constrains routing to a specific URL path.
   path: ""
-  # Wildcard behaviour; defaults to "None" when left empty.
+  # openShiftRoute.wildcardPolicy configures wildcard host handling (None or Subdomain).
   wildcardPolicy: ""
+  # openShiftRoute.port configures the target service port used by the Route.
   port:
-    # Target service port exposed through the route.
+    # openShiftRoute.port.targetPort references the named service port exposed via the Route.
     targetPort: http
+  # openShiftRoute.to configures backend weighting for load balancing.
   to:
-    # Adjust when balancing against multiple services; default weight 100 is omitted from the manifest.
+    # openShiftRoute.to.weight adjusts traffic weighting across multiple service backends.
     weight: 100
-  # Extra service backends following the RouteTargetReference schema.
+  # openShiftRoute.alternateBackends adds additional backend targets following RouteTargetReference schema.
   alternateBackends: []
-  # TLS termination settings; set to null to disable, or provide termination, certificates, etc.
+  # openShiftRoute.tls defines TLS termination settings or disables TLS when set to null.
   tls: null
 
+# resources defines CPU and memory requests/limits for Besu containers.
 resources:
   {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
   # limits:
   #   cpu: 100m
   #   memory: 128Mi
@@ -250,65 +319,90 @@ resources:
   #   cpu: 100m
   #   memory: 128Mi
 
-# This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-# Besu publishes dedicated /liveness and /readiness endpoints on the JSON-RPC service port; probe timings cover startup warm-up.
+# livenessProbe configures the HTTP probe used to determine if the container should be restarted.
 livenessProbe:
+  # livenessProbe.httpGet.path hits the Besu liveness endpoint.
   httpGet:
     path: /liveness
+    # livenessProbe.httpGet.port references the named container port serving HTTP JSON-RPC.
     port: json-rpc
+  # livenessProbe.initialDelaySeconds waits before starting liveness checks.
   initialDelaySeconds: 30
+  # livenessProbe.periodSeconds schedules how frequently the probe runs.
   periodSeconds: 10
+  # livenessProbe.timeoutSeconds caps how long the probe waits for a response.
   timeoutSeconds: 2
+  # livenessProbe.failureThreshold restarts the pod after this many consecutive failures.
   failureThreshold: 3
+
+# readinessProbe configures the HTTP probe used to advertise readiness to receive traffic.
 readinessProbe:
+  # readinessProbe.httpGet.path hits the readiness endpoint with peer and sync thresholds.
   httpGet:
     path: /readiness?minPeers=0&maxBlocksBehind=100
+    # readinessProbe.httpGet.port references the named container port serving HTTP JSON-RPC.
     port: json-rpc
+  # readinessProbe.initialDelaySeconds waits before starting readiness checks.
   initialDelaySeconds: 15
+  # readinessProbe.periodSeconds schedules how frequently the readiness probe runs.
   periodSeconds: 10
+  # readinessProbe.timeoutSeconds caps the probe response time.
   timeoutSeconds: 2
+  # readinessProbe.failureThreshold marks the pod unready after this many consecutive failures.
   failureThreshold: 3
 
-# Persistent storage configuration for the StatefulSet more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+# persistence configures persistent storage for validator and RPC nodes.
 persistence:
+  # persistence.enabled toggles persistent volume usage for ledger data.
   enabled: false
-  # When enabled without an existingClaim, a PersistentVolumeClaim is created per replica.
+  # persistence.mountPath is the container directory where the volume is mounted.
   mountPath: /data
+  # persistence.volumeName names the volume when using volumeClaimTemplates.
   volumeName: data
+  # persistence.accessModes declares the desired access modes for the PVC.
   accessModes:
     - ReadWriteOnce
-  # size is required when persistence.enabled is true and existingClaim is not set. Increase storage by resizing the bound PVC or switching to an existingClaim.
+  # persistence.size defines the requested storage capacity when provisioning PVCs.
   size: 20Gi
+  # persistence.storageClass selects the Kubernetes StorageClass; leave empty for default.
   storageClass: ""
+  # persistence.volumeMode switches between Filesystem and Block volume modes.
   volumeMode: ""
-  # Set existingClaim to reuse a pre-provisioned PVC that you manage (supports manual resizing).
+  # persistence.existingClaim references a pre-created PersistentVolumeClaim to reuse.
   existingClaim: ""
-  # Optional PVC metadata.
+  # persistence.annotations attaches metadata annotations to created PVCs.
   annotations: {}
+  # persistence.selector filters PersistentVolumes when binding static PVs.
   selector: {}
+  # persistence.retention configures how PVCs are handled during deletion or scale-down.
   retention:
+    # persistence.retention.whenDeleted dictates PVC behaviour when the Helm release is deleted.
     whenDeleted: Retain
+    # persistence.retention.whenScaled dictates PVC behaviour when replicas are scaled down.
     whenScaled: Delete
-  # Optional mount fine-tuning.
+  # persistence.subPath mounts a subdirectory of the volume instead of the root.
   subPath: ""
+  # persistence.readOnly mounts the volume read-only when true.
   readOnly: false
 
-
-# Additional volumes on the output StatefulSet definition.
+# volumes lists extra volumes attached to each Besu pod for custom configuration or secrets.
 volumes: []
 # - name: foo
 #   secret:
 #     secretName: mysecret
 #     optional: false
 
-# Additional volumeMounts on the output StatefulSet definition.
+# volumeMounts lists additional container volume mounts beyond the defaults.
 volumeMounts: []
 # - name: foo
 #   mountPath: "/etc/foo"
 #   readOnly: true
 
+# nodeSelector constrains pod scheduling to nodes with matching labels.
 nodeSelector: {}
 
+# tolerations allows pods to schedule onto nodes with corresponding taints.
 tolerations: []
 
+# affinity defines node and pod affinity/anti-affinity rules for advanced scheduling.
 affinity: {}
