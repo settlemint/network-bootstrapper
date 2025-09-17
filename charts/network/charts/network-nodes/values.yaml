@@ -348,20 +348,20 @@ livenessProbe:
 
 # Readiness probe configuration signalling when pods can accept traffic.
 readinessProbe:
-  # HTTP GET probe configuration hitting the Besu readiness endpoint.
-  httpGet:
-    # -- (string) HTTP path used for readiness probing, including peer/sync thresholds.
-    path: /liveness
-    # -- (string|int) Target container port serving the readiness endpoint.
-    port: json-rpc
-  # -- (int) Seconds to wait before starting readiness checks.
-  initialDelaySeconds: 15
-  # -- (int) Frequency of readiness checks in seconds.
-  periodSeconds: 5
-  # -- (int) Timeout in seconds before marking the probe as failed.
-  timeoutSeconds: 2
-  # -- (int) Consecutive failures required before the pod is considered unready.
-  failureThreshold: 3
+  # # HTTP GET probe configuration hitting the Besu readiness endpoint.
+  # httpGet:
+  #   # -- (string) HTTP path used for readiness probing, including peer/sync thresholds.
+  #   path: /liveness
+  #   # -- (string|int) Target container port serving the readiness endpoint.
+  #   port: json-rpc
+  # # -- (int) Seconds to wait before starting readiness checks.
+  # initialDelaySeconds: 15
+  # # -- (int) Frequency of readiness checks in seconds.
+  # periodSeconds: 5
+  # # -- (int) Timeout in seconds before marking the probe as failed.
+  # timeoutSeconds: 2
+  # # -- (int) Consecutive failures required before the pod is considered unready.
+  # failureThreshold: 3
 
 # Persistent storage configuration for both validator and RPC StatefulSets.
 persistence:
