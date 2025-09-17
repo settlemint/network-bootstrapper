@@ -33,7 +33,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
     "@types/bun": "latest",
-    "ultracite": "5.3.5"
+    "ultracite": "5.3.8"
   },
   "peerDependencies": {
     "typescript": "^5"
