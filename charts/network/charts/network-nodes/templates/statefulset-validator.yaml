@@ -28,6 +28,9 @@ spec:
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
   {{- $validatorReplicaBudget := (include "nodes.validatorReplicaCount" . | int) }}
+  {{- $initContainers := .Values.initContainers | default (dict) }}
+  {{- $sharedInitContainers := get $initContainers "shared" }}
+  {{- $validatorInitContainers := get $initContainers "validator" }}
   replicas: {{ $validatorReplicaBudget }}
   serviceName: {{ include "nodes.fullname" . }}
   {{- if and $useClaimTemplate (or (ne $whenDeleted "") (ne $whenScaled "")) }}
@@ -64,6 +67,11 @@ spec:
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or $sharedInitContainers $validatorInitContainers }}
+      initContainers:
+{{- include "nodes.renderInitContainers" (dict "context" $root "containers" $sharedInitContainers "indent" 8) }}
+{{- include "nodes.renderInitContainers" (dict "context" $root "containers" $validatorInitContainers "indent" 8) }}
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
