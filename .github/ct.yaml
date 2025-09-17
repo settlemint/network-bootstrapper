@@ -2,3 +2,4 @@ chart-dirs:
   - charts
 remote: origin
 target-branch: main
+check-version-increment: false
