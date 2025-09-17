@@ -24,11 +24,11 @@
     "check": "ultracite check",
     "check:fix": "ultracite fix",
     "test": "bun test",
-    "helm": "helm upgrade --install networkbootstrapper ./charts/network-bootstrapper -n networkbootstrapper --create-namespace --timeout 15m",
+    "helm": "helm upgrade --install network ./charts/network -n network --create-namespace --timeout 15m",
     "docs:helm": "helm-docs --chart-search-root=. --skip-version-footer",
     "docs:cli": "cat README.tpl > README.md && echo '\n```' >> README.md && bun src/index.ts --help >> README.md && echo '```' >> README.md",
-    "package:pack": "helm package charts/network-bootstrapper --destination .",
-    "package:push:harbor": "helm push ./network-bootstrapper-*.tgz oci://harbor.settlemint.com/atk"
+    "package:pack": "helm package charts/network --destination .",
+    "package:push:harbor": "helm push ./network-*.tgz oci://harbor.settlemint.com/atk"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",

@@ -75,15 +75,21 @@ const PRIVATE_KEY_HEX_LENGTH = 64;
 const PUBLIC_KEY_HEX_LENGTH = 128;
 const HEX_RADIX = 16;
 const SAMPLE_VALIDATOR_INDEX = 1;
-const SAMPLE_RPC_INDEX = 2;
 const SAMPLE_FAUCET_INDEX = 99;
-const EXPECTED_CONFIGMAP_COUNT = 9;
-const EXPECTED_SECRET_COUNT = 3;
+const EXPECTED_CONFIGMAP_COUNT = 7;
+const EXPECTED_SECRET_COUNT = 2;
 const HEX_PREFIX_PATTERN = /^0x/;
 const TEST_CHAIN_ID = 1;
 const HTTP_CONFLICT_STATUS = 409;
 const HTTP_INTERNAL_ERROR_STATUS = 500;
 const HTTP_SERVICE_UNAVAILABLE_STATUS = 503;
+const LEADING_DOT_REGEX = /^\./u;
+const DEFAULT_STATIC_NODE_PORT = 30_303;
+const DEFAULT_STATIC_NODE_DISCOVERY_PORT = 30_303;
+const SAMPLE_STATIC_DOMAIN = "svc.cluster.local";
+const SAMPLE_STATIC_NAMESPACE = "network";
+const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
+const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
 
 const sampleNode = (index: number): IndexedNode => {
   const hexValue = index.toString(HEX_RADIX);
@@ -100,11 +106,59 @@ const sampleNode = (index: number): IndexedNode => {
   };
 };
 
+const staticNodeUri = (
+  node: IndexedNode,
+  domain?: string,
+  port = DEFAULT_STATIC_NODE_PORT,
+  discoveryPort = DEFAULT_STATIC_NODE_DISCOVERY_PORT,
+  namespace?: string
+): string => {
+  const trimmedDomain =
+    domain === undefined || domain.trim().length === 0
+      ? undefined
+      : domain.trim().replace(LEADING_DOT_REGEX, "");
+  const trimmedNamespace =
+    namespace === undefined || namespace.trim().length === 0
+      ? undefined
+      : namespace.trim();
+  const ordinal = node.index - 1;
+  const podName = `besu-node-validator-${ordinal}`;
+  const serviceName = "besu-node";
+  const segments = [podName, serviceName];
+  if (trimmedNamespace) {
+    segments.push(trimmedNamespace);
+  }
+  if (trimmedDomain) {
+    segments.push(trimmedDomain);
+  }
+  const host = segments.join(".");
+  const publicKey = node.publicKey.startsWith("0x")
+    ? node.publicKey.slice(2)
+    : node.publicKey;
+  const nodeId =
+    publicKey.startsWith(UNCOMPRESSED_PUBLIC_KEY_PREFIX) &&
+    publicKey.length === UNCOMPRESSED_PUBLIC_KEY_LENGTH
+      ? publicKey.slice(2)
+      : publicKey;
+  return `enode://${nodeId}@${host}:${port}?discport=${discoveryPort}`;
+};
+
+const sampleValidator = sampleNode(SAMPLE_VALIDATOR_INDEX);
+const sampleFaucet = sampleNode(SAMPLE_FAUCET_INDEX);
+
 const samplePayload: OutputPayload = {
-  faucet: sampleNode(SAMPLE_FAUCET_INDEX),
+  faucet: sampleFaucet,
   genesis: { config: { chainId: TEST_CHAIN_ID }, extraData: "0xabc" },
-  rpcNodes: [sampleNode(SAMPLE_RPC_INDEX)],
-  validators: [sampleNode(SAMPLE_VALIDATOR_INDEX)],
+  validators: [sampleValidator],
+  staticNodes: [
+    staticNodeUri(
+      sampleValidator,
+      SAMPLE_STATIC_DOMAIN,
+      DEFAULT_STATIC_NODE_PORT,
+      DEFAULT_STATIC_NODE_DISCOVERY_PORT,
+      SAMPLE_STATIC_NAMESPACE
+    ),
+  ],
 };
 
 describe("outputResult", () => {
@@ -113,6 +167,7 @@ describe("outputResult", () => {
     await outputResult("screen", samplePayload);
     expect(output).toContain("Genesis");
     expect(output).toContain("Validator Nodes");
+    expect(output).toContain("Static Nodes");
   });
 
   test("file output writes json artifacts", async () => {
@@ -134,15 +189,12 @@ describe("outputResult", () => {
         "besu-faucet-enode",
         "besu-faucet-private-key",
         "besu-faucet-pubkey",
-        "besu-node-rpc-node-2-address",
-        "besu-node-rpc-node-2-enode",
-        "besu-node-rpc-node-2-private-key",
-        "besu-node-rpc-node-2-pubkey",
-        "besu-node-validator-1-address",
-        "besu-node-validator-1-enode",
-        "besu-node-validator-1-private-key",
-        "besu-node-validator-1-pubkey",
+        "besu-node-validator-0-address",
+        "besu-node-validator-0-enode",
+        "besu-node-validator-0-private-key",
+        "besu-node-validator-0-pubkey",
         "genesis",
+        "static-nodes.json",
       ].sort()
     );
 
@@ -151,6 +203,12 @@ describe("outputResult", () => {
       "utf8"
     );
     expect(genesisContent).toContain(`"chainId": ${TEST_CHAIN_ID}`);
+
+    const staticNodesContent = await readFile(
+      join(targetDirPath, "static-nodes.json"),
+      "utf8"
+    );
+    expect(JSON.parse(staticNodesContent)).toEqual(samplePayload.staticNodes);
 
     await rm("out", { recursive: true, force: true });
   });
@@ -233,21 +291,28 @@ describe("outputResult", () => {
       expect(createdConfigMaps).toHaveLength(EXPECTED_CONFIGMAP_COUNT);
       expect(createdSecrets).toHaveLength(EXPECTED_SECRET_COUNT);
       const mapNames = createdConfigMaps.map((entry) => entry.name).sort();
-      expect(mapNames).toContain("besu-node-validator-1-address");
+      expect(mapNames).toContain("besu-node-validator-0-address");
       expect(mapNames).toContain("besu-genesis");
       expect(mapNames).toContain("besu-faucet-address");
       expect(mapNames).toContain("besu-faucet-pubkey");
+      expect(mapNames).toContain("besu-static-nodes");
       expect(mapNames).not.toContain("besu-faucet-enode");
       const secretNames = createdSecrets.map((entry) => entry.name).sort();
       expect(secretNames).toEqual([
         "besu-faucet-private-key",
-        "besu-node-rpc-node-2-private-key",
-        "besu-node-validator-1-private-key",
+        "besu-node-validator-0-private-key",
       ]);
       const privateKeySecret = createdSecrets.find((entry) =>
-        entry.name.endsWith("validator-1-private-key")
+        entry.name.endsWith("validator-0-private-key")
       );
       expect(privateKeySecret?.data?.privateKey).toMatch(HEX_PREFIX_PATTERN);
+      const staticNodesConfig = createdConfigMaps.find(
+        (entry) => entry.name === "besu-static-nodes"
+      );
+      expect(staticNodesConfig?.data?.["static-nodes.json"]).toBeDefined();
+      expect(
+        JSON.parse(staticNodesConfig?.data?.["static-nodes.json"] ?? "[]")
+      ).toEqual(samplePayload.staticNodes);
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
       (KubeConfig.prototype as any).makeApiClient = originalMake;
@@ -292,7 +357,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "ConfigMap besu-node-validator-1-address already exists. Delete it or choose a different output target."
+        "ConfigMap besu-node-validator-0-address already exists. Delete it or choose a different output target."
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -338,7 +403,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "Secret besu-node-validator-1-private-key already exists. Delete it or choose a different output target."
+        "Secret besu-node-validator-0-private-key already exists. Delete it or choose a different output target."
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -481,7 +546,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "Failed to create ConfigMap besu-node-validator-1-address: boom"
+        "Failed to create ConfigMap besu-node-validator-0-address: boom"
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -520,7 +585,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "Failed to create ConfigMap besu-node-validator-1-address: failed"
+        "Failed to create ConfigMap besu-node-validator-0-address: failed"
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -561,7 +626,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "Failed to create ConfigMap besu-node-validator-1-address: unknown error"
+        "Failed to create ConfigMap besu-node-validator-0-address: unknown error"
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -602,7 +667,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "Failed to create ConfigMap besu-node-validator-1-address: denied"
+        "Failed to create ConfigMap besu-node-validator-0-address: denied"
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;

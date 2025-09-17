@@ -38,12 +38,22 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
+            - generate
+            {{- $clusterDomain := default "svc.cluster.local" .Values.settings.clusterDomain }}
+            {{- $defaultStaticPort := default 30303 .Values.settings.defaultStaticNodePort }}
+            {{- $defaultStaticDiscovery := default 30303 .Values.settings.defaultStaticNodeDiscoveryPort }}
+            {{- $resolvedStaticDomain := default $clusterDomain .Values.settings.staticNodeDomain }}
+            {{- $resolvedStaticPort := default $defaultStaticPort .Values.settings.staticNodePort }}
+            {{- $resolvedStaticDiscovery := default $defaultStaticDiscovery .Values.settings.staticNodeDiscoveryPort }}
             {{- with .Values.settings.validators }}
             - --validators={{ . }}
             {{- end }}
-            {{- with .Values.settings.rpcNodes }}
-            - --rpc-nodes={{ . }}
+            - --static-node-namespace={{ default .Release.Namespace .Values.settings.staticNodeNamespace }}
+            {{- if $resolvedStaticDomain }}
+            - --static-node-domain={{ $resolvedStaticDomain }}
             {{- end }}
+            - --static-node-port={{ $resolvedStaticPort }}
+            - --static-node-discovery-port={{ $resolvedStaticDiscovery }}
             {{- with .Values.settings.allocations }}
             - --allocations={{ . }}
             {{- end }}

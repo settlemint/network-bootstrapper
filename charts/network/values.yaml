@@ -1,0 +1,1 @@
+# This parent chart does not define additional values; override subchart defaults here when packaging composite releases.

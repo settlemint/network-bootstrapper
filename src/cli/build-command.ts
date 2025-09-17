@@ -25,10 +25,13 @@ type CliOptions = {
   evmStackSize?: number;
   gasLimit?: string;
   gasPrice?: number;
-  rpcNodes?: number;
   validators?: number;
   outputType?: OutputType;
   secondsPerBlock?: number;
+  staticNodeDomain?: string;
+  staticNodeNamespace?: string;
+  staticNodePort?: number;
+  staticNodeDiscoveryPort?: number;
 };
 
 type BootstrapDependencies = {
@@ -41,8 +44,11 @@ type BootstrapDependencies = {
 };
 
 const DEFAULT_VALIDATOR_COUNT = 4;
-const DEFAULT_RPC_COUNT = 2;
+const DEFAULT_STATIC_NODE_PORT = 30_303;
 const OUTPUT_CHOICES: OutputType[] = ["screen", "file", "kubernetes"];
+const LEADING_DOT_REGEX = /^\./u;
+const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
+const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
 
 // Normalizes CLI inputs wrapped by orchestrators that keep literal quotes.
 const stripSurroundingQuotes = (value: string): string => {
@@ -96,6 +102,75 @@ const generateGroup = (factory: NodeKeyFactory, count: number): IndexedNode[] =>
     ...factory.generate(),
   }));
 
+const normalizeStaticNodeDomain = (
+  domain: string | undefined
+): string | undefined => {
+  if (!domain) {
+    return;
+  }
+
+  const trimmed = domain.trim().replace(LEADING_DOT_REGEX, "");
+  return trimmed.length === 0 ? undefined : trimmed;
+};
+
+const normalizeStaticNodeNamespace = (
+  namespace: string | undefined
+): string | undefined => {
+  if (!namespace) {
+    return;
+  }
+
+  const trimmed = namespace.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+};
+
+const deriveNodeId = (publicKey: string): string => {
+  const trimmed = publicKey.startsWith("0x") ? publicKey.slice(2) : publicKey;
+  if (
+    trimmed.startsWith(UNCOMPRESSED_PUBLIC_KEY_PREFIX) &&
+    trimmed.length === UNCOMPRESSED_PUBLIC_KEY_LENGTH
+  ) {
+    return trimmed.slice(2);
+  }
+  return trimmed;
+};
+
+const createStaticNodeEntries = (
+  nodes: readonly IndexedNode[],
+  {
+    namespace,
+    domain,
+    port,
+    discoveryPort,
+  }: {
+    namespace?: string;
+    domain?: string;
+    port: number;
+    discoveryPort: number;
+  }
+): string[] => {
+  const normalizedDomain = normalizeStaticNodeDomain(domain);
+  const normalizedNamespace = normalizeStaticNodeNamespace(namespace);
+
+  return nodes.map((node) => {
+    // StatefulSet pod ordinals start at 0 even though our generator indexes start at 1.
+    const ordinal = node.index - 1;
+    const podName = `besu-node-validator-${ordinal}`;
+    const serviceName = "besu-node"; // Headless service fronting validator pods
+    const segments = [podName, serviceName];
+    if (normalizedNamespace) {
+      segments.push(normalizedNamespace);
+    }
+    if (normalizedDomain) {
+      segments.push(normalizedDomain);
+    }
+    const host = segments.join(".");
+    const nodeId = deriveNodeId(node.publicKey);
+
+    return `enode://${nodeId}@${host}:${port}?discport=${discoveryPort}`;
+  });
+};
+
 const runBootstrap = async (
   options: CliOptions,
   deps: BootstrapDependencies
@@ -110,9 +185,12 @@ const runBootstrap = async (
     gasLimit,
     gasPrice,
     outputType,
-    rpcNodes: rpcNodeOption,
     secondsPerBlock,
     validators: validatorOption,
+    staticNodeDomain: staticNodeDomainOption,
+    staticNodeNamespace: staticNodeNamespaceOption,
+    staticNodePort: staticNodePortOption,
+    staticNodeDiscoveryPort: staticNodeDiscoveryPortOption,
   } = options;
 
   const resolveCount = (
@@ -134,15 +212,15 @@ const runBootstrap = async (
     validatorOption,
     DEFAULT_VALIDATOR_COUNT
   );
-  const rpcNodeCount = await resolveCount(
-    "RPC nodes",
-    rpcNodeOption,
-    DEFAULT_RPC_COUNT
-  );
 
   const validators = generateGroup(deps.factory, validatorsCount);
-  const rpcNodes = generateGroup(deps.factory, rpcNodeCount);
   const faucet = deps.factory.generate();
+  const staticNodes = createStaticNodeEntries(validators, {
+    namespace: staticNodeNamespaceOption,
+    domain: staticNodeDomainOption,
+    port: staticNodePortOption ?? DEFAULT_STATIC_NODE_PORT,
+    discoveryPort: staticNodeDiscoveryPortOption ?? DEFAULT_STATIC_NODE_PORT,
+  });
 
   const validatorAddresses = validators.map<HexAddress>((node) => node.address);
 
@@ -171,8 +249,8 @@ const runBootstrap = async (
   const payload: OutputPayload = {
     faucet,
     genesis,
-    rpcNodes,
     validators,
+    staticNodes,
   };
 
   await deps.outputResult(outputType ?? "screen", payload);
@@ -196,20 +274,21 @@ const createCliCommand = (
 
   command
     .name("network-bootstrapper")
+    .description("Utilities for configuring Besu-based networks.");
+
+  // Keep the root command free of options so future subcommands can compose alongside generate.
+  const generate = command
+    .command("generate")
     .description(
       "Generate node identities, configure consensus, and emit a Besu genesis."
-    )
+    );
+
+  generate
     .option(
       "-v, --validators <count>",
       "Number of validator nodes to generate.",
       createCountParser("Validators"),
       DEFAULT_VALIDATOR_COUNT
-    )
-    .option(
-      "-r, --rpc-nodes <count>",
-      "Number of RPC nodes to generate.",
-      createCountParser("RPC nodes"),
-      DEFAULT_RPC_COUNT
     )
     .option(
       "-a, --allocations <file>",
@@ -228,6 +307,29 @@ const createCliCommand = (
         );
       },
       "screen"
+    )
+    .option(
+      "--static-node-domain <domain>",
+      "DNS suffix appended to validator peer hostnames for static-nodes entries.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
+      "--static-node-namespace <name>",
+      "Namespace segment inserted between service name and domain for static-nodes entries.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
+      "--static-node-port <number>",
+      "P2P port used for static-nodes enode URIs.",
+      (value: string) => parsePositiveInteger(value, "Static node port"),
+      DEFAULT_STATIC_NODE_PORT
+    )
+    .option(
+      "--static-node-discovery-port <number>",
+      "Discovery port used for static-nodes enode URIs.",
+      (value: string) =>
+        parseNonNegativeInteger(value, "Static node discovery port"),
+      DEFAULT_STATIC_NODE_PORT
     )
     .option(
       "--consensus <algorithm>",
@@ -282,31 +384,48 @@ const createCliCommand = (
     .option(
       "--accept-defaults",
       "Accept default values for all prompts when CLI flags are omitted. (default: disabled)"
-    );
+    )
+    .action(async (options: CliOptions, cmd: Command) => {
+      const normalizedOptions: CliOptions = {
+        ...options,
+        validators:
+          cmd.getOptionValueSource("validators") === "default"
+            ? undefined
+            : options.validators,
+        staticNodeDomain:
+          cmd.getOptionValueSource("staticNodeDomain") === "default"
+            ? undefined
+            : options.staticNodeDomain,
+        staticNodeNamespace:
+          cmd.getOptionValueSource("staticNodeNamespace") === "default"
+            ? undefined
+            : options.staticNodeNamespace,
+        staticNodePort:
+          cmd.getOptionValueSource("staticNodePort") === "default"
+            ? undefined
+            : options.staticNodePort,
+        staticNodeDiscoveryPort:
+          cmd.getOptionValueSource("staticNodeDiscoveryPort") === "default"
+            ? undefined
+            : options.staticNodeDiscoveryPort,
+      };
 
-  command.action(async (options: CliOptions, cmd: Command) => {
-    const normalizedOptions: CliOptions = {
-      ...options,
-      validators:
-        cmd.getOptionValueSource("validators") === "default"
-          ? undefined
-          : options.validators,
-      rpcNodes:
-        cmd.getOptionValueSource("rpcNodes") === "default"
-          ? undefined
-          : options.rpcNodes,
-    };
+      const sanitizedOptions: CliOptions = {
+        ...normalizedOptions,
+        allocations:
+          normalizedOptions.allocations === undefined
+            ? undefined
+            : stripSurroundingQuotes(normalizedOptions.allocations),
+        staticNodeDomain: normalizeStaticNodeDomain(
+          normalizedOptions.staticNodeDomain
+        ),
+        staticNodeNamespace: normalizeStaticNodeNamespace(
+          normalizedOptions.staticNodeNamespace
+        ),
+      };
 
-    const sanitizedOptions: CliOptions = {
-      ...normalizedOptions,
-      allocations:
-        normalizedOptions.allocations === undefined
-          ? undefined
-          : stripSurroundingQuotes(normalizedOptions.allocations),
-    };
-
-    await runBootstrap(sanitizedOptions, deps);
-  });
+      await runBootstrap(sanitizedOptions, deps);
+    });
 
   return command;
 };
