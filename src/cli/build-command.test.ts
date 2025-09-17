@@ -16,6 +16,8 @@ const EXPECTED_DEFAULT_VALIDATOR = 4;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
 const CUSTOM_STATIC_NODE_PORT = 40_000;
 const LEADING_DOT_REGEX = /^\./u;
+const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
+const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
 const HEX_RADIX = 16;
 const PAD_WIDTH = 2;
 const PAD_CHAR = "0";
@@ -80,7 +82,12 @@ const expectedStaticNodeUri = (
   }
   const host = segments.join(".");
   const publicKey = expectedPublicKey(index).slice(2);
-  return `enode://${publicKey}@${host}:${port}?discport=${discoveryPort}`;
+  const nodeId =
+    publicKey.startsWith(UNCOMPRESSED_PUBLIC_KEY_PREFIX) &&
+    publicKey.length === UNCOMPRESSED_PUBLIC_KEY_LENGTH
+      ? publicKey.slice(2)
+      : publicKey;
+  return `enode://${nodeId}@${host}:${port}?discport=${discoveryPort}`;
 };
 
 const captureStdout = () => {

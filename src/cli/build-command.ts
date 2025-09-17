@@ -47,6 +47,8 @@ const DEFAULT_VALIDATOR_COUNT = 4;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
 const OUTPUT_CHOICES: OutputType[] = ["screen", "file", "kubernetes"];
 const LEADING_DOT_REGEX = /^\./u;
+const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
+const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
 
 // Normalizes CLI inputs wrapped by orchestrators that keep literal quotes.
 const stripSurroundingQuotes = (value: string): string => {
@@ -122,6 +124,17 @@ const normalizeStaticNodeNamespace = (
   return trimmed.length === 0 ? undefined : trimmed;
 };
 
+const deriveNodeId = (publicKey: string): string => {
+  const trimmed = publicKey.startsWith("0x") ? publicKey.slice(2) : publicKey;
+  if (
+    trimmed.startsWith(UNCOMPRESSED_PUBLIC_KEY_PREFIX) &&
+    trimmed.length === UNCOMPRESSED_PUBLIC_KEY_LENGTH
+  ) {
+    return trimmed.slice(2);
+  }
+  return trimmed;
+};
+
 const createStaticNodeEntries = (
   nodes: readonly IndexedNode[],
   {
@@ -150,11 +163,9 @@ const createStaticNodeEntries = (
       segments.push(normalizedDomain);
     }
     const host = segments.join(".");
-    const publicKey = node.publicKey.startsWith("0x")
-      ? node.publicKey.slice(2)
-      : node.publicKey;
+    const nodeId = deriveNodeId(node.publicKey);
 
-    return `enode://${publicKey}@${host}:${port}?discport=${discoveryPort}`;
+    return `enode://${nodeId}@${host}:${port}?discport=${discoveryPort}`;
   });
 };
 

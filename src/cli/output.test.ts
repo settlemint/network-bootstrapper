@@ -88,6 +88,8 @@ const DEFAULT_STATIC_NODE_PORT = 30_303;
 const DEFAULT_STATIC_NODE_DISCOVERY_PORT = 30_303;
 const SAMPLE_STATIC_DOMAIN = "svc.cluster.local";
 const SAMPLE_STATIC_NAMESPACE = "network";
+const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
+const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
 
 const sampleNode = (index: number): IndexedNode => {
   const hexValue = index.toString(HEX_RADIX);
@@ -132,7 +134,12 @@ const staticNodeUri = (
   const publicKey = node.publicKey.startsWith("0x")
     ? node.publicKey.slice(2)
     : node.publicKey;
-  return `enode://${publicKey}@${host}:${port}?discport=${discoveryPort}`;
+  const nodeId =
+    publicKey.startsWith(UNCOMPRESSED_PUBLIC_KEY_PREFIX) &&
+    publicKey.length === UNCOMPRESSED_PUBLIC_KEY_LENGTH
+      ? publicKey.slice(2)
+      : publicKey;
+  return `enode://${nodeId}@${host}:${port}?discport=${discoveryPort}`;
 };
 
 const sampleValidator = sampleNode(SAMPLE_VALIDATOR_INDEX);
