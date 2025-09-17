@@ -118,12 +118,7 @@ A Helm chart for Kubernetes
 | podAnnotations."prometheus.io/scrape" | string | `"true"` | Enables Prometheus scraping of the Besu metrics endpoint. |
 | podLabels | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
-| readinessProbe.failureThreshold | int | `3` | Consecutive failures required before the pod is considered unready. |
-| readinessProbe.httpGet.path | string | `"/liveness"` | HTTP path used for readiness probing, including peer/sync thresholds. |
-| readinessProbe.httpGet.port | string|int | `"json-rpc"` | Target container port serving the readiness endpoint. |
-| readinessProbe.initialDelaySeconds | int | `15` | Seconds to wait before starting readiness checks. |
-| readinessProbe.periodSeconds | int | `5` | Frequency of readiness checks in seconds. |
-| readinessProbe.timeoutSeconds | int | `2` | Timeout in seconds before marking the probe as failed. |
+| readinessProbe | string | `nil` |  |
 | resources | object | `{}` |  |
 | rpcReplicaCount | int | `2` | Number of RPC node replicas provisioned via StatefulSet. |
 | securityContext | object | `{}` |  |
