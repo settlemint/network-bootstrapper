@@ -27,7 +27,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
     "@types/bun": "latest",
-    "ultracite": "5.3.4"
+    "ultracite": "5.3.5"
   },
   "peerDependencies": {
     "typescript": "^5"
