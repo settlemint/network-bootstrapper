@@ -6,18 +6,21 @@ Generate node identities, configure consensus, and emit a Besu genesis. Then use
 
 The helm chart to run this on Kubernetes / OpenShift can be found [here](./charts/network-bootstrapper/README.md)
 
-### Install from GitHub Pages
+### Install from GHCR
 
-The published chart repository lives at `https://settlemint.github.io/network-bootstrapper/`. Add it to Helm, sync indexes, and install the `network` chart:
+Charts are published as OCI artifacts at `oci://ghcr.io/settlemint/network-bootstrapper`. Install directly from the registry by referencing the desired release tag:
 
 ```bash
-helm repo add network-bootstrapper https://settlemint.github.io/network-bootstrapper/
-helm repo update
+VERSION="0.1.0" # replace with the release you need
 
-helm upgrade --install besu-network network-bootstrapper/network \
+helm upgrade --install besu-network \
+  oci://ghcr.io/settlemint/network-bootstrapper/network \
+  --version "${VERSION}" \
   --namespace besu \
   --create-namespace
 ```
+
+Use `helm show chart oci://ghcr.io/settlemint/network-bootstrapper/network --version <tag>` to inspect metadata before installing.
 
 ### Deployment modes
 
