@@ -2,4 +2,3 @@ chart-dirs:
   - charts
 remote: origin
 target-branch: main
-helm-extra-args: "--wait --wait-for-jobs --timeout 600s"
