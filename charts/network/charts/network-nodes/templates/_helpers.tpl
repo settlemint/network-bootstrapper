@@ -62,6 +62,32 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Resolve the number of validator replicas, falling back to global overrides when provided.
+*/}}
+{{- define "nodes.validatorReplicaCount" -}}
+{{- $explicit := .Values.validatorReplicaCount -}}
+{{- if not (empty $explicit) -}}
+{{- $explicit | int -}}
+{{- else -}}
+{{- $global := default (dict) .Values.global -}}
+{{- $networkGlobal := dict -}}
+{{- if and (kindIs "map" $global) (hasKey $global "network") -}}
+  {{- $networkCandidate := index $global "network" -}}
+  {{- if kindIs "map" $networkCandidate -}}
+    {{- $networkGlobal = $networkCandidate -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (kindIs "map" $networkGlobal) (hasKey $networkGlobal "validatorReplicaCount") -}}
+{{- (index $networkGlobal "validatorReplicaCount") | int -}}
+{{- else if and (kindIs "map" $global) (hasKey $global "validatorReplicaCount") -}}
+{{- (index $global "validatorReplicaCount") | int -}}
+{{- else -}}
+4
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Render init container specifications provided via values.
 Accepts either a YAML string or a list of init container maps and indents output appropriately.
 */}}

@@ -27,11 +27,11 @@ spec:
   {{- $useClaimTemplate := and $persistenceEnabled (not $useExistingClaim) }}
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
-  {{- $validatorReplicaBudget := .Values.validatorReplicaCount | int }}
+  {{- $validatorReplicaBudget := (include "nodes.validatorReplicaCount" . | int) }}
   {{- $initContainers := .Values.initContainers | default (dict) }}
   {{- $sharedInitContainers := get $initContainers "shared" }}
   {{- $validatorInitContainers := get $initContainers "validator" }}
-  replicas: {{ .Values.validatorReplicaCount }}
+  replicas: {{ $validatorReplicaBudget }}
   serviceName: {{ include "nodes.fullname" . }}
   {{- if and $useClaimTemplate (or (ne $whenDeleted "") (ne $whenScaled "")) }}
   persistentVolumeClaimRetentionPolicy:
