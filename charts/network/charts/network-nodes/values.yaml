@@ -508,7 +508,7 @@ persistence:
     # -- (string) Behaviour of PVCs when the Helm release is deleted.
     whenDeleted: Retain
     # -- (string) Behaviour of PVCs when the StatefulSet scales down.
-    whenScaled: Delete
+    whenScaled: Retain
   # -- (string) Subdirectory of the volume to mount instead of the root.
   subPath: ""
   # -- (bool) Mount the volume read-only when true.
