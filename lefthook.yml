@@ -4,8 +4,17 @@ pre-commit:
       run: bun run check:fix || true
       stage_fixed: true
     docs_cli:
-      run: bun run docs:cli || true
+      run: |
+        if bun run docs:cli; then
+          git add README.md
+        fi
       stage_fixed: true
     docs_helm:
-      run: bun run docs:helm || true
+      run: |
+        if bun run docs:helm; then
+          git add \
+            charts/network/README.md \
+            charts/network/charts/network-bootstrapper/README.md \
+            charts/network/charts/network-nodes/README.md
+        fi
       stage_fixed: true
