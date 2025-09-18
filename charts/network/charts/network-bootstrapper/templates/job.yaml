@@ -71,8 +71,10 @@ spec:
             {{- $globalNodes := default (dict) (get $globalValues "networkNodes") }}
             {{- $localChainId := get $settingsValues "chainId" }}
             {{- $globalChainId := get $globalValues "chainId" }}
-            {{- $localChainIdSet := not (kindIs "invalid" $localChainId) }}
-            {{- $globalChainIdSet := not (kindIs "invalid" $globalChainId) }}
+            {{- $localChainIdBlank := and (kindIs "string" $localChainId) (eq (trim $localChainId) "") }}
+            {{- $globalChainIdBlank := and (kindIs "string" $globalChainId) (eq (trim $globalChainId) "") }}
+            {{- $localChainIdSet := and (not (kindIs "invalid" $localChainId)) (not $localChainIdBlank) (not (empty $localChainId)) }}
+            {{- $globalChainIdSet := and (not (kindIs "invalid" $globalChainId)) (not $globalChainIdBlank) (not (empty $globalChainId)) }}
             {{- $resolvedChainId := ternary $localChainId $globalChainId $localChainIdSet }}
             {{- $autoNames := dict "service" "besu-node" "podPrefix" "besu-node-validator" }}
             {{- with (index $.Subcharts "network-nodes") }}

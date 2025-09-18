@@ -22,8 +22,8 @@ A Helm chart for a blockchain network on Kubernetes
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | extraInitContainers | list | `[]` | Additional init containers appended verbatim to each workload. |
-| global | object | `{"chainId":null,"networkNodes":{"faucetArtifactPrefix":"besu-faucet","genesisConfigMapName":"besu-genesis","podPrefix":"","serviceName":"","staticNodesConfigMapName":"besu-static-nodes"},"securityContexts":{"container":{},"pod":{}}}` | Global configuration shared across subcharts. |
-| global.chainId | int | `nil` | Chain ID applied when charts omit explicit overrides. |
+| global | object | `{"chainId":13456,"networkNodes":{"faucetArtifactPrefix":"besu-faucet","genesisConfigMapName":"besu-genesis","podPrefix":"","serviceName":"","staticNodesConfigMapName":"besu-static-nodes"},"securityContexts":{"container":{},"pod":{}}}` | Global configuration shared across subcharts. |
+| global.chainId | int | `13456` | Chain ID applied when charts omit explicit overrides. |
 | global.networkNodes | object | `{"faucetArtifactPrefix":"besu-faucet","genesisConfigMapName":"besu-genesis","podPrefix":"","serviceName":"","staticNodesConfigMapName":"besu-static-nodes"}` | Defaults consumed by Besu network node workloads. |
 | global.networkNodes.faucetArtifactPrefix | string | `"besu-faucet"` | Prefix used for faucet ConfigMaps and Secrets. |
 | global.networkNodes.genesisConfigMapName | string | `"besu-genesis"` | ConfigMap name storing the generated genesis.json artifact. |
