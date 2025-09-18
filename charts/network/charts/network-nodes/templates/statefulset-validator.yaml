@@ -32,6 +32,8 @@ spec:
   {{- $staticNodesConfigMapName := default "besu-static-nodes" (get $globalNodes "staticNodesConfigMapName") }}
   {{- $validatorPodPrefix := default "besu-node-validator" (get $globalNodes "podPrefix") }}
   {{- $validatorReplicaBudget := (include "nodes.validatorReplicaCount" . | int) }}
+  {{- $priorityClasses := .Values.priorityClassNames | default (dict) }}
+  {{- $validatorPriorityClass := default "" (get $priorityClasses "validator") }}
   {{- $initContainers := .Values.initContainers | default (dict) }}
   {{- $sharedInitContainers := get $initContainers "shared" }}
   {{- $validatorInitContainers := get $initContainers "validator" }}
@@ -69,6 +71,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "nodes.serviceAccountName" . }}
+      {{- if $validatorPriorityClass }}
+      priorityClassName: {{ $validatorPriorityClass | quote }}
+      {{- end }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
