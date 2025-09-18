@@ -41,11 +41,13 @@ podLabels: {}
 # Pod-level security context applied to all containers in the pod.
 podSecurityContext:
   {}
+  # -- Leave empty to inherit from global.securityContexts.pod.
   # fsGroup: 2000
 
 # Container security context applied to the bootstrapper container.
 securityContext:
   {}
+  # -- Leave empty to inherit from global.securityContexts.container.
   # capabilities:
   #   drop:
   #   - ALL

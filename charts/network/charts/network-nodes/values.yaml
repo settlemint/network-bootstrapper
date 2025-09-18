@@ -169,11 +169,13 @@ priorityClassNames:
 # Pod-level security context shared by all containers.
 podSecurityContext:
   {}
+  # -- Leave empty to inherit from global.securityContexts.pod.
   # fsGroup: 2000
 
 # Container-level security context applied to Besu containers.
 securityContext:
   {}
+  # -- Leave empty to inherit from global.securityContexts.container.
   # capabilities:
   #   drop:
   #   - ALL
