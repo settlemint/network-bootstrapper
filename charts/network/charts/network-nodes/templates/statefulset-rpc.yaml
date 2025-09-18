@@ -38,8 +38,8 @@ spec:
   {{- $rpcInitContainers := get $initContainers "rpc" }}
   {{- $globalValues := (.Values.global | default (dict)) }}
   {{- $globalSecurityContexts := dig "securityContexts" $globalValues (dict) }}
-  {{- $podSecurityContext := merge (deepCopy (default (dict) .Values.podSecurityContext)) (dig "pod" $globalSecurityContexts (dict)) }}
-  {{- $containerSecurityContext := merge (deepCopy (default (dict) .Values.securityContext)) (dig "container" $globalSecurityContexts (dict)) }}
+  {{- $podSecurityContext := mergeOverwrite (deepCopy (dig "pod" $globalSecurityContexts (dict))) (default (dict) .Values.podSecurityContext) }}
+  {{- $containerSecurityContext := mergeOverwrite (deepCopy (dig "container" $globalSecurityContexts (dict))) (default (dict) .Values.securityContext) }}
   podManagementPolicy: Parallel
   replicas: {{ .Values.rpcReplicaCount }}
   serviceName: {{ include "nodes.fullname" . }}-rpc
