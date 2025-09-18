@@ -153,6 +153,13 @@ networkPolicy:
         - protocol: TCP
           port: 30303
 
+# PriorityClass configuration applied to Besu workloads.
+priorityClassNames:
+  # -- PriorityClass name assigned to validator pods. Leave empty to inherit namespace defaults.
+  validator: ""
+  # -- PriorityClass name assigned to RPC pods. Leave empty to inherit namespace defaults.
+  rpc: ""
+
 # Pod-level security context shared by all containers.
 podSecurityContext:
   {}

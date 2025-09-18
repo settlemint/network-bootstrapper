@@ -31,6 +31,8 @@ spec:
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
   {{- $rpcReplicaBudget := .Values.rpcReplicaCount | int }}
+  {{- $priorityClasses := .Values.priorityClassNames | default (dict) }}
+  {{- $rpcPriorityClass := default "" (get $priorityClasses "rpc") }}
   {{- $initContainers := .Values.initContainers | default (dict) }}
   {{- $sharedInitContainers := get $initContainers "shared" }}
   {{- $rpcInitContainers := get $initContainers "rpc" }}
@@ -68,6 +70,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "nodes.serviceAccountName" . }}
+      {{- if $rpcPriorityClass }}
+      priorityClassName: {{ $rpcPriorityClass | quote }}
+      {{- end }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}

@@ -139,6 +139,8 @@ A Helm chart for Kubernetes
 | podDisruptionBudgets.validator.unhealthyPodEvictionPolicy | string | `""` | Optional unhealthy pod eviction policy (Default or AlwaysAllow). |
 | podLabels | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
+| priorityClassNames.rpc | string | `""` | PriorityClass name assigned to RPC pods. Leave empty to inherit namespace defaults. |
+| priorityClassNames.validator | string | `""` | PriorityClass name assigned to validator pods. Leave empty to inherit namespace defaults. |
 | readinessProbe | string | `nil` |  |
 | resources | object | `{}` |  |
 | rpcReplicaCount | int | `2` | Number of RPC node replicas provisioned via StatefulSet. |
