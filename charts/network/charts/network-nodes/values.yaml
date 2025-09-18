@@ -150,6 +150,11 @@ networkPolicy:
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+            # Adjust the except list to match internal cluster CIDRs to avoid bypassing other policies.
       ports:
         - protocol: TCP
           port: 30303
