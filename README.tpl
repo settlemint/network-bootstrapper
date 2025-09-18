@@ -160,9 +160,10 @@ Use this runbook to grow the validator and RPC data volumes without recreating t
 
 4. Confirm every claim reports the larger capacity (wait for `FileSystemResizePending` to clear if your CSI driver performs an in-pod resize):
 
+   > **Note:** The `FileSystemResizePending` status typically clears within a few minutes, but may take up to 10–15 minutes depending on your storage backend and cluster load. If the status persists longer than expected, check your CSI driver logs and node status for issues. For troubleshooting, see [Kubernetes PVC resizing documentation](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims).
+
    ```bash
    kubectl get pvc -n "${NAMESPACE}" -l app.kubernetes.io/instance="${RELEASE}" -w
-   ```
 
 If the StorageClass sets `allowVolumeExpansion: false`, patch it to `true` before running the loop or redeploy with a class that supports online resizing.
 
