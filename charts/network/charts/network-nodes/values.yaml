@@ -483,7 +483,7 @@ readinessProbe:
 # Persistent storage configuration for both validator and RPC StatefulSets.
 persistence:
   # -- (bool) Enable persistent volume claims for ledger data.
-  enabled: false
+  enabled: true
   # -- (string) Container path where the persistent volume is mounted.
   mountPath: /data
   # -- (string) Logical name for the volume when using volumeClaimTemplates.
