@@ -108,7 +108,7 @@ networkPolicy:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: graph-node
-        - podSelector: {}
+        # - podSelector: {} # Uncomment to allow any pod within the namespace.
       ports:
         - protocol: TCP
           port: 8545
