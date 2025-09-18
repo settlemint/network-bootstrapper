@@ -148,7 +148,8 @@ networkPolicy:
           port: 30303
     # Allow outbound P2P connections to external peers (public networks).
     - to:
-        - namespaceSelector: {}
+        - ipBlock:
+            cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
           port: 30303
