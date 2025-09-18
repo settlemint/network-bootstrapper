@@ -49,6 +49,123 @@ podAnnotations:
 # Additional labels applied to all Besu pods.
 podLabels: {}
 
+# PodDisruptionBudget configuration for validator and RPC workloads.
+podDisruptionBudgets:
+  # -- PodDisruptionBudget controlling voluntary disruptions for validator pods.
+  validator:
+    # -- Enable the validator PodDisruptionBudget.
+    enabled: false
+    # -- Minimum validator pods that must remain available. Mutually exclusive with maxUnavailable.
+    minAvailable: 1
+    # -- Maximum validator pods that can be disrupted at once. Mutually exclusive with minAvailable.
+    maxUnavailable:
+    # -- Optional unhealthy pod eviction policy (Default or AlwaysAllow).
+    unhealthyPodEvictionPolicy: ""
+    # -- Additional annotations applied to the validator PodDisruptionBudget.
+    annotations: {}
+    # -- Additional labels applied to the validator PodDisruptionBudget.
+    labels: {}
+  # -- PodDisruptionBudget governing RPC pods.
+  rpc:
+    # -- Enable the RPC PodDisruptionBudget.
+    enabled: false
+    # -- Minimum RPC pods that must remain available. Mutually exclusive with maxUnavailable.
+    minAvailable: 1
+    # -- Maximum RPC pods that can be disrupted at once. Mutually exclusive with minAvailable.
+    maxUnavailable:
+    # -- Optional unhealthy pod eviction policy (Default or AlwaysAllow).
+    unhealthyPodEvictionPolicy: ""
+    # -- Additional annotations applied to the RPC PodDisruptionBudget.
+    annotations: {}
+    # -- Additional labels applied to the RPC PodDisruptionBudget.
+    labels: {}
+
+# NetworkPolicy configuration applied to Besu pods.
+networkPolicy:
+  # -- Create a NetworkPolicy restricting Besu pod ingress and egress.
+  enabled: false
+  # -- Optional override for the default pod selector; defaults to Besu workload labels when empty.
+  podSelector: {}
+  # -- Policy types enforced by the NetworkPolicy. When empty, inferred from ingress/egress rules or defaults to both.
+  policyTypes: []
+  # -- Additional labels to add to the NetworkPolicy metadata.
+  labels: {}
+  # -- Additional annotations to add to the NetworkPolicy metadata.
+  annotations: {}
+  # -- NetworkPolicy ingress rules. Leave empty to deny all ingress when enabled.
+  ingress:
+    # Allow blockchain clients to reach RPC, WS, GraphQL, and metrics endpoints.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: txsigner
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: erpc
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: blockscout-stack
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: graph-node
+        # - podSelector: {} # Uncomment to allow any pod within the namespace.
+      ports:
+        - protocol: TCP
+          port: 8545
+        - protocol: TCP
+          port: 8546
+        - protocol: TCP
+          port: 8547
+        - protocol: TCP
+          port: 9545
+    # Permit intra-cluster P2P traffic among Besu nodes.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: besu-statefulset
+      ports:
+        - protocol: TCP
+          port: 30303
+
+  # -- NetworkPolicy egress rules. Leave empty to deny all egress when enabled.
+  egress:
+    # Allow DNS resolution for outbound hosts.
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Permit Besu pods to speak to peers inside the namespace.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: besu-statefulset
+      ports:
+        - protocol: TCP
+          port: 30303
+    # Allow outbound P2P connections to external peers (public networks).
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+            # Adjust the except list to match internal cluster CIDRs to avoid bypassing other policies.
+      ports:
+        - protocol: TCP
+          port: 30303
+
+# PriorityClass configuration applied to Besu workloads.
+priorityClassNames:
+  # -- PriorityClass name assigned to validator pods. Leave empty to inherit namespace defaults.
+  validator: ""
+  # -- PriorityClass name assigned to RPC pods. Leave empty to inherit namespace defaults.
+  rpc: ""
+
 # Pod-level security context shared by all containers.
 podSecurityContext:
   {}
@@ -391,7 +508,7 @@ persistence:
     # -- (string) Behaviour of PVCs when the Helm release is deleted.
     whenDeleted: Retain
     # -- (string) Behaviour of PVCs when the StatefulSet scales down.
-    whenScaled: Delete
+    whenScaled: Retain
   # -- (string) Subdirectory of the volume to mount instead of the root.
   subPath: ""
   # -- (bool) Mount the volume read-only when true.
