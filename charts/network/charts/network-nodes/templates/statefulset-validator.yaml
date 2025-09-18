@@ -37,10 +37,9 @@ spec:
   {{- $initContainers := .Values.initContainers | default (dict) }}
   {{- $sharedInitContainers := get $initContainers "shared" }}
   {{- $validatorInitContainers := get $initContainers "validator" }}
-  {{- $globalValues := (.Values.global | default (dict)) }}
-  {{- $globalSecurityContexts := dig "securityContexts" $globalValues (dict) }}
-  {{- $podSecurityContext := mergeOverwrite (deepCopy (dig "pod" $globalSecurityContexts (dict))) (default (dict) .Values.podSecurityContext) }}
-  {{- $containerSecurityContext := mergeOverwrite (deepCopy (dig "container" $globalSecurityContexts (dict))) (default (dict) .Values.securityContext) }}
+  {{- $securityContexts := include "nodes.securityContexts" . | fromYaml }}
+  {{- $podSecurityContext := index $securityContexts "pod" }}
+  {{- $containerSecurityContext := index $securityContexts "container" }}
   podManagementPolicy: Parallel
   replicas: {{ $validatorReplicaBudget }}
   serviceName: {{ include "nodes.fullname" . }}
