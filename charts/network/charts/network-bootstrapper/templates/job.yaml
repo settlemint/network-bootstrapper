@@ -29,8 +29,8 @@ spec:
       serviceAccountName: {{ include "network-bootstrapper.serviceAccountName" . }}
       {{- $globalValues := (.Values.global | default (dict)) }}
       {{- $globalSecurityContexts := dig "securityContexts" $globalValues (dict) }}
-      {{- $podSecurityContext := merge (deepCopy (dig "pod" $globalSecurityContexts (dict))) (default (dict) .Values.podSecurityContext) | default (dict) }}
-      {{- $containerSecurityContext := merge (deepCopy (dig "container" $globalSecurityContexts (dict))) (default (dict) .Values.securityContext) | default (dict) }}
+      {{- $podSecurityContext := merge (deepCopy (dig "pod" $globalSecurityContexts (dict))) (default (dict) .Values.podSecurityContext) }}
+      {{- $containerSecurityContext := merge (deepCopy (dig "container" $globalSecurityContexts (dict))) (default (dict) .Values.securityContext) }}
       {{- if $podSecurityContext }}
       securityContext:
         {{- toYaml $podSecurityContext | nindent 8 }}
