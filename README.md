@@ -140,7 +140,7 @@ Use this runbook to grow the validator and RPC data volumes without recreating t
      --values values.yaml
    ```
 
-3. Expand the in-use PVCs with plain `kubectl` so the StatefulSets keep running while storage grows:
+3. Expand the in-use PVCs with plain `kubectl` so the StatefulSets keep running while storage grows. The loop echoes success or failure for each PVC—investigate any errors (insufficient quota, permissions, driver limits) before proceeding:
 
    ```bash
    # IMPORTANT: Set this to the same value as `network-nodes.persistence.size` from step 1.
@@ -153,8 +153,12 @@ Use this runbook to grow the validator and RPC data volumes without recreating t
        -l app.kubernetes.io/instance="${RELEASE}",app.kubernetes.io/component="${component}" \
        -o name \
      | while read -r pvc; do
-         kubectl patch -n "${NAMESPACE}" "${pvc}" --type merge \
-           -p "{\"spec\":{\"resources\":{\"requests\":{\"storage\":\"${NEW_SIZE}\"}}}}"
+         if kubectl patch -n "${NAMESPACE}" "${pvc}" --type merge \
+           -p "{\"spec\":{\"resources\":{\"requests\":{\"storage\":\"${NEW_SIZE}\"}}}}"; then
+           echo "Successfully patched ${pvc}"
+         else
+           echo "ERROR: Failed to patch ${pvc}" >&2
+         fi
        done
    done
    ```
