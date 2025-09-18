@@ -143,6 +143,7 @@ Use this runbook to grow the validator and RPC data volumes without recreating t
 3. Expand the in-use PVCs with plain `kubectl` so the StatefulSets keep running while storage grows:
 
    ```bash
+   # IMPORTANT: Set this to the same value as `network-nodes.persistence.size` from step 1.
    NEW_SIZE="200Gi"
    RELEASE="besu-network"
    NAMESPACE="besu"
