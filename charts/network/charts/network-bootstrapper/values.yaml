@@ -1,4 +1,9 @@
 # Default configuration values for the network-bootstrapper subchart. Each key is annotated for helm-docs output.
+
+global:
+  # -- (int) Chain ID applied when `settings.chainId` is unset.
+  chainId:
+
 image:
   # -- (string) OCI registry path hosting the network bootstrapper image.
   repository: ghcr.io/settlemint/network-bootstrapper
@@ -152,7 +157,7 @@ settings:
   outputType: kubernetes
   # -- (string) Consensus engine to configure (QBFT or IBFTv2).
   consensus:
-  # -- (int) Explicit chain ID to encode into the genesis file.
+  # -- (int) Explicit chain ID to encode into the genesis file. Leave unset to inherit from global.chainId.
   chainId:
   # -- (int) Block interval in seconds for the genesis configuration.
   secondsPerBlock:

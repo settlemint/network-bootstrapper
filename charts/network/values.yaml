@@ -14,6 +14,8 @@ global:
     staticNodesConfigMapName: besu-static-nodes
     # -- (string) Prefix used for faucet ConfigMaps and Secrets.
     faucetArtifactPrefix: besu-faucet
+  # -- (int) Chain ID applied when charts omit explicit overrides.
+  chainId:
   # -- (object) Shared pod- and container-level security contexts applied when subcharts omit explicit overrides.
   securityContexts:
     # -- (object) Pod security context inherited by subcharts when set.

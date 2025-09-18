@@ -55,7 +55,14 @@ spec:
             {{- $resolvedStaticDomain := default $clusterDomain .Values.settings.staticNodeDomain }}
             {{- $resolvedStaticPort := default $defaultStaticPort .Values.settings.staticNodePort }}
             {{- $resolvedStaticDiscovery := default $defaultStaticDiscovery .Values.settings.staticNodeDiscoveryPort }}
-            {{- $globalNodes := default (dict) .Values.global.networkNodes }}
+            {{- $globalValues := default (dict) .Values.global }}
+            {{- $settingsValues := default (dict) .Values.settings }}
+            {{- $globalNodes := default (dict) (get $globalValues "networkNodes") }}
+            {{- $localChainId := get $settingsValues "chainId" }}
+            {{- $globalChainId := get $globalValues "chainId" }}
+            {{- $localChainIdSet := not (kindIs "invalid" $localChainId) }}
+            {{- $globalChainIdSet := not (kindIs "invalid" $globalChainId) }}
+            {{- $resolvedChainId := ternary $localChainId $globalChainId $localChainIdSet }}
             {{- $autoNames := dict "service" "besu-node" "podPrefix" "besu-node-validator" }}
             {{- with (index $.Subcharts "network-nodes") }}
               {{- $service := include "nodes.fullname" . }}
@@ -92,8 +99,8 @@ spec:
             {{- with .Values.settings.consensus }}
             - --consensus={{ . }}
             {{- end }}
-            {{- with .Values.settings.chainId }}
-            - --chain-id={{ . }}
+            {{- if or $localChainIdSet $globalChainIdSet }}
+            - --chain-id={{ $resolvedChainId }}
             {{- end }}
             {{- with .Values.settings.secondsPerBlock }}
             - --seconds-per-block={{ . }}
