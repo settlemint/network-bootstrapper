@@ -60,6 +60,7 @@ A Helm chart for Kubernetes
 | config.ws.host | string | `"0.0.0.0"` | Network interface for the WebSocket listener. |
 | config.ws.maxActiveConnections | int | `2000` | Maximum concurrent WebSocket connections. |
 | config.ws.maxFrameSize | int | `2097152` | Maximum WebSocket frame size in bytes. |
+| extraInitContainers | list | `[]` | Additional init containers appended verbatim to both StatefulSets. |
 | fullnameOverride | string | `"besu-node"` | Override for the fully qualified release name used in resource naming. |
 | httpRoute.annotations | object | `{}` |  |
 | httpRoute.enabled | bool | `false` | Enable rendering of an HTTPRoute resource. |
@@ -78,9 +79,16 @@ A Helm chart for Kubernetes
 | ingress.enabled | bool | `false` | Enable creation of an Ingress resource. |
 | ingress.hosts | list | `[{"host":"chart-example.local","paths":[{"path":"/","pathType":"ImplementationSpecific"}]}]` | Hostname and path routing rules for the Ingress. |
 | ingress.tls | list | `[]` | TLS configuration for Ingress hosts. |
-| initContainers.rpc | list|string | `[]` | Additional init containers exclusively for RPC pods. |
-| initContainers.shared | list|string | `[]` | Init containers applied to both validator and RPC pods. |
-| initContainers.validator | list|string | `[]` | Additional init containers exclusively for validator pods. |
+| initContainer.tcpCheck.dependencies | list | `[]` | TCP dependencies expressed as name/endpoint pairs (host:port strings). |
+| initContainer.tcpCheck.enabled | bool | `false` | Enable a tcp-check init container before Besu pods start. |
+| initContainer.tcpCheck.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for the tcp-check init container. |
+| initContainer.tcpCheck.image.repository | string | `"ghcr.io/settlemint/btp-waitforit"` | OCI image hosting the tcp-check utility. |
+| initContainer.tcpCheck.image.tag | string | `"v7.7.10"` | Image tag for the tcp-check utility. |
+| initContainer.tcpCheck.resources.limits.cpu | string | `"100m"` |  |
+| initContainer.tcpCheck.resources.limits.memory | string | `"64Mi"` |  |
+| initContainer.tcpCheck.resources.requests.cpu | string | `"10m"` |  |
+| initContainer.tcpCheck.resources.requests.memory | string | `"32Mi"` |  |
+| initContainer.tcpCheck.timeout | int | `120` | Timeout in seconds applied to each dependency probe. |
 | livenessProbe.failureThreshold | int | `3` | Consecutive failures required before the container is restarted. |
 | livenessProbe.httpGet.path | string | `"/readiness?minPeers=1&maxBlocksBehind=10000"` | HTTP path used for liveness probing. |
 | livenessProbe.httpGet.port | string|int | `"json-rpc"` | Target container port serving the liveness endpoint. |

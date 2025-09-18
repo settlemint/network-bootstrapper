@@ -62,21 +62,81 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Render init container specifications provided via values.
-Accepts either a YAML string or a list of init container maps and indents output appropriately.
+Render a tcp-check init container when enabled.
 */}}
-{{- define "network-bootstrapper.renderInitContainers" -}}
-{{- $ctx := .context -}}
-{{- $containers := .containers -}}
-{{- $indent := .indent | default 2 -}}
-{{- if $containers -}}
-{{- if kindIs "string" $containers -}}
-{{ tpl $containers $ctx | nindent $indent }}
-{{- else -}}
+{{- define "network-bootstrapper.tcpCheckInitContainer" -}}
+{{- $ctx := index . "context" -}}
+{{- $cfg := default (dict) (index . "config") -}}
+{{- $indent := index . "indent" | default 2 -}}
+{{- $enabled := default false (get $cfg "enabled") -}}
+{{- if $enabled -}}
+{{- $image := default (dict) (get $cfg "image") -}}
+{{- $repository := default "ghcr.io/settlemint/btp-waitforit" (get $image "repository") -}}
+{{- $tag := default "v7.7.10" (get $image "tag") -}}
+{{- $pullPolicy := default "IfNotPresent" (get $image "pullPolicy") -}}
+{{- $timeout := default 120 (get $cfg "timeout") -}}
+{{- $resources := get $cfg "resources" -}}
+{{- $dependencies := default (list) (get $cfg "dependencies") -}}
+{{- $count := len $dependencies -}}
+{{- $script := include "network-bootstrapper.tcpCheckScript" (dict "ctx" $ctx "timeout" $timeout "dependencies" $dependencies "count" $count) -}}
+{{- $container := dict "name" "tcp-check" "image" (printf "%s:%s" $repository $tag) "imagePullPolicy" $pullPolicy "command" (list "/bin/sh" "-ec") "args" (list $script) -}}
+{{- if $resources }}{{- $_ := set $container "resources" $resources }}{{- end -}}
+{{ toYaml (list $container) | nindent $indent }}
+{{- end -}}
+{{- end }}
+
+{{/*
+Produce the shell script executed by the tcp-check init container.
+*/}}
+{{- define "network-bootstrapper.tcpCheckScript" -}}
+set -euo pipefail
+INTERVAL=2
+TIMEOUT={{ index . "timeout" }}
+if [ {{ index . "count" }} -eq 0 ]; then
+  echo "No dependencies configured; skipping checks."
+  exit 0
+fi
+
+check() {
+  name="$1"
+  endpoint="$2"
+  host="${endpoint%:*}"
+  port="${endpoint##*:}"
+  echo "Waiting for ${name} (${endpoint})..."
+  elapsed=0
+  while true; do
+    if nc -z "$host" "$port" >/dev/null 2>&1; then
+      echo "${name} ready."
+      break
+    fi
+    sleep "${INTERVAL}"
+    elapsed=$((elapsed+INTERVAL))
+    if [ "$elapsed" -ge "$TIMEOUT" ]; then
+      echo "Timeout waiting for ${name} (${endpoint})."
+      exit 1
+    fi
+  done
+}
+
+{{- range $dependency := index . "dependencies" }}
+{{- $name := default "dependency" (get $dependency "name") }}
+{{- $endpointTemplate := default "" (get $dependency "endpoint") }}
+{{- $endpoint := tpl $endpointTemplate (index . "ctx") }}
+check {{ printf "%q" $name }} {{ printf "%q" $endpoint }}
+{{- end }}
+{{- end }}
+
+{{/*
+Render arbitrarily defined init containers without modification.
+*/}}
+{{- define "network-bootstrapper.extraInitContainers" -}}
+{{- $ctx := index . "context" -}}
+{{- $containers := default (list) (index . "containers") -}}
+{{- $indent := index . "indent" | default 2 -}}
+{{- if gt (len $containers) 0 -}}
 {{ tpl (toYaml $containers) $ctx | nindent $indent }}
 {{- end -}}
-{{- end -}}
-{{- end -}}
+{{- end }}
 
 {{/*
 Resolve pod and container security contexts by layering chart values over global defaults.

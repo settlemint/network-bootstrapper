@@ -35,9 +35,21 @@ spec:
       securityContext:
         {{- toYaml $podSecurityContext | nindent 8 }}
       {{- end }}
-      {{- with .Values.initContainers }}
+      {{- $globalValues := default (dict) .Values.global }}
+      {{- $initConfig := default (dict) .Values.initContainer }}
+      {{- $globalInitConfig := default (dict) (get $globalValues "initContainer") }}
+      {{- $globalTcpDefaults := default (dict) (get $globalInitConfig "tcpCheck") }}
+      {{- $chartTcpOverrides := default (dict) (get $initConfig "tcpCheck") }}
+      {{- $tcpCheckConfig := mergeOverwrite (deepCopy $globalTcpDefaults) $chartTcpOverrides }}
+      {{- $globalExtraInit := default (list) (get $globalValues "extraInitContainers") }}
+      {{- $chartExtraInit := default (list) .Values.extraInitContainers }}
+      {{- $extraInitContainers := concat $globalExtraInit $chartExtraInit }}
+      {{- $tcpEnabled := default false (get $tcpCheckConfig "enabled") }}
+      {{- $hasExtraInit := gt (len $extraInitContainers) 0 }}
+      {{- if or $tcpEnabled $hasExtraInit }}
       initContainers:
-{{- include "network-bootstrapper.renderInitContainers" (dict "context" $ "containers" . "indent" 8) }}
+{{- include "network-bootstrapper.tcpCheckInitContainer" (dict "context" . "config" $tcpCheckConfig "indent" 8) }}
+{{- include "network-bootstrapper.extraInitContainers" (dict "context" . "containers" $extraInitContainers "indent" 8) }}
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
@@ -55,7 +67,6 @@ spec:
             {{- $resolvedStaticDomain := default $clusterDomain .Values.settings.staticNodeDomain }}
             {{- $resolvedStaticPort := default $defaultStaticPort .Values.settings.staticNodePort }}
             {{- $resolvedStaticDiscovery := default $defaultStaticDiscovery .Values.settings.staticNodeDiscoveryPort }}
-            {{- $globalValues := default (dict) .Values.global }}
             {{- $settingsValues := default (dict) .Values.settings }}
             {{- $globalNodes := default (dict) (get $globalValues "networkNodes") }}
             {{- $localChainId := get $settingsValues "chainId" }}

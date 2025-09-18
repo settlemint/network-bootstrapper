@@ -7,7 +7,8 @@ metadata:
     app.kubernetes.io/component: rpc
 spec:
   {{- $root := . }}
-  {{- $globalNodes := .Values.global.networkNodes | default (dict) }}
+  {{- $globalValues := default (dict) .Values.global }}
+  {{- $globalNodes := default (dict) (get $globalValues "networkNodes") }}
   {{- $genesisConfigMapName := default "besu-genesis" (get $globalNodes "genesisConfigMapName") }}
   {{- $staticNodesConfigMapName := default "besu-static-nodes" (get $globalNodes "staticNodesConfigMapName") }}
   {{- $persistence := .Values.persistence | default (dict) }}
@@ -33,9 +34,16 @@ spec:
   {{- $rpcReplicaBudget := .Values.rpcReplicaCount | int }}
   {{- $priorityClasses := .Values.priorityClassNames | default (dict) }}
   {{- $rpcPriorityClass := default "" (get $priorityClasses "rpc") }}
-  {{- $initContainers := .Values.initContainers | default (dict) }}
-  {{- $sharedInitContainers := get $initContainers "shared" }}
-  {{- $rpcInitContainers := get $initContainers "rpc" }}
+  {{- $initConfig := default (dict) .Values.initContainer }}
+  {{- $globalInitConfig := default (dict) (get $globalValues "initContainer") }}
+  {{- $globalTcpDefaults := default (dict) (get $globalInitConfig "tcpCheck") }}
+  {{- $chartTcpOverrides := default (dict) (get $initConfig "tcpCheck") }}
+  {{- $tcpCheckConfig := mergeOverwrite (deepCopy $globalTcpDefaults) $chartTcpOverrides }}
+  {{- $globalExtraInit := default (list) (get $globalValues "extraInitContainers") }}
+  {{- $chartExtraInit := default (list) .Values.extraInitContainers }}
+  {{- $extraInitContainers := concat $globalExtraInit $chartExtraInit }}
+  {{- $tcpEnabled := default false (get $tcpCheckConfig "enabled") }}
+  {{- $hasExtraInit := gt (len $extraInitContainers) 0 }}
   {{- $securityContexts := dict -}}
   {{- include "nodes.securityContexts" (dict "ctx" . "dest" $securityContexts) -}}
   {{- $podSecurityContext := index $securityContexts "pod" }}
@@ -81,10 +89,10 @@ spec:
       securityContext:
         {{- toYaml $podSecurityContext | nindent 8 }}
       {{- end }}
-      {{- if or $sharedInitContainers $rpcInitContainers }}
+      {{- if or $tcpEnabled $hasExtraInit }}
       initContainers:
-{{- include "nodes.renderInitContainers" (dict "context" $root "containers" $sharedInitContainers "indent" 8) }}
-{{- include "nodes.renderInitContainers" (dict "context" $root "containers" $rpcInitContainers "indent" 8) }}
+{{- include "nodes.tcpCheckInitContainer" (dict "context" $root "config" $tcpCheckConfig "indent" 8) }}
+{{- include "nodes.extraInitContainers" (dict "context" $root "containers" $extraInitContainers "indent" 8) }}
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}

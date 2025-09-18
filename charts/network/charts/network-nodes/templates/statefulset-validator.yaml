@@ -27,16 +27,24 @@ spec:
   {{- $useClaimTemplate := and $persistenceEnabled (not $useExistingClaim) }}
   {{- $privateKeyFilename := default "privateKey" .Values.config.privateKeyFilename }}
   {{- $shouldMountPersistence := $persistenceEnabled }}
-  {{- $globalNodes := .Values.global.networkNodes | default (dict) }}
+  {{- $globalValues := default (dict) .Values.global }}
+  {{- $globalNodes := default (dict) (get $globalValues "networkNodes") }}
   {{- $genesisConfigMapName := default "besu-genesis" (get $globalNodes "genesisConfigMapName") }}
   {{- $staticNodesConfigMapName := default "besu-static-nodes" (get $globalNodes "staticNodesConfigMapName") }}
   {{- $validatorPodPrefix := default "besu-node-validator" (get $globalNodes "podPrefix") }}
   {{- $validatorReplicaBudget := (include "nodes.validatorReplicaCount" . | int) }}
   {{- $priorityClasses := .Values.priorityClassNames | default (dict) }}
   {{- $validatorPriorityClass := default "" (get $priorityClasses "validator") }}
-  {{- $initContainers := .Values.initContainers | default (dict) }}
-  {{- $sharedInitContainers := get $initContainers "shared" }}
-  {{- $validatorInitContainers := get $initContainers "validator" }}
+  {{- $initConfig := default (dict) .Values.initContainer }}
+  {{- $globalInitConfig := default (dict) (get $globalValues "initContainer") }}
+  {{- $globalTcpDefaults := default (dict) (get $globalInitConfig "tcpCheck") }}
+  {{- $chartTcpOverrides := default (dict) (get $initConfig "tcpCheck") }}
+  {{- $tcpCheckConfig := mergeOverwrite (deepCopy $globalTcpDefaults) $chartTcpOverrides }}
+  {{- $globalExtraInit := default (list) (get $globalValues "extraInitContainers") }}
+  {{- $chartExtraInit := default (list) .Values.extraInitContainers }}
+  {{- $extraInitContainers := concat $globalExtraInit $chartExtraInit }}
+  {{- $tcpEnabled := default false (get $tcpCheckConfig "enabled") }}
+  {{- $hasExtraInit := gt (len $extraInitContainers) 0 }}
   {{- $securityContexts := dict -}}
   {{- include "nodes.securityContexts" (dict "ctx" . "dest" $securityContexts) -}}
   {{- $podSecurityContext := index $securityContexts "pod" }}
@@ -82,10 +90,10 @@ spec:
       securityContext:
         {{- toYaml $podSecurityContext | nindent 8 }}
       {{- end }}
-      {{- if or $sharedInitContainers $validatorInitContainers }}
+      {{- if or $tcpEnabled $hasExtraInit }}
       initContainers:
-{{- include "nodes.renderInitContainers" (dict "context" $root "containers" $sharedInitContainers "indent" 8) }}
-{{- include "nodes.renderInitContainers" (dict "context" $root "containers" $validatorInitContainers "indent" 8) }}
+{{- include "nodes.tcpCheckInitContainer" (dict "context" $root "config" $tcpCheckConfig "indent" 8) }}
+{{- include "nodes.extraInitContainers" (dict "context" $root "containers" $extraInitContainers "indent" 8) }}
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
