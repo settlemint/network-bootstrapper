@@ -112,6 +112,60 @@ rm values-external.yaml
 
 Summon resolves the secrets in memory, `envsubst` renders them into a transient values file, and Helm creates the ConfigMaps/Secrets required by the Besu nodes. The temporary file is removed once the release is installed.
 
+### Scale StatefulSet PVC storage (runbook)
+
+Use this runbook to grow the validator and RPC data volumes without recreating the StatefulSets.
+
+1. Edit your Helm values so new pods request the larger capacity and keep the updated defaults:
+
+   ```yaml
+   network-nodes:
+     persistence:
+       enabled: true
+       storageClass: fast-ssd        # cluster storage class that supports expansion
+       size: 200Gi                   # target size for every validator/RPC PVC
+       retention:
+         whenDeleted: Retain
+         whenScaled: Retain
+   ```
+
+2. Roll the values into the release (reuse your existing overrides):
+
+   ```bash
+   RELEASE="besu-network"
+   NAMESPACE="besu"
+
+   helm upgrade --install "${RELEASE}" ./charts/network \
+     --namespace "${NAMESPACE}" \
+     --values values.yaml
+   ```
+
+3. Expand the in-use PVCs with plain `kubectl` so the StatefulSets keep running while storage grows:
+
+   ```bash
+   NEW_SIZE="200Gi"
+   RELEASE="besu-network"
+   NAMESPACE="besu"
+
+   for component in validator rpc; do
+     kubectl get pvc -n "${NAMESPACE}" \
+       -l app.kubernetes.io/instance="${RELEASE}",app.kubernetes.io/component="${component}" \
+       -o name \
+     | while read -r pvc; do
+         kubectl patch -n "${NAMESPACE}" "${pvc}" --type merge \
+           -p "{\"spec\":{\"resources\":{\"requests\":{\"storage\":\"${NEW_SIZE}\"}}}}"
+       done
+   done
+   ```
+
+4. Confirm every claim reports the larger capacity (wait for `FileSystemResizePending` to clear if your CSI driver performs an in-pod resize):
+
+   ```bash
+   kubectl get pvc -n "${NAMESPACE}" -l app.kubernetes.io/instance="${RELEASE}" -w
+   ```
+
+If the StorageClass sets `allowVolumeExpansion: false`, patch it to `true` before running the loop or redeploy with a class that supports online resizing.
+
 ### Local artefact generation with Docker
 
 Run the bootstrapper container locally to capture all artefacts before loading them into Conjur or another secret manager.
