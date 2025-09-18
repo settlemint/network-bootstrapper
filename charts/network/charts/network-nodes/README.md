@@ -112,7 +112,7 @@ A Helm chart for Kubernetes
 | persistence.mountPath | string | `"/data"` | Container path where the persistent volume is mounted. |
 | persistence.readOnly | bool | `false` | Mount the volume read-only when true. |
 | persistence.retention.whenDeleted | string | `"Retain"` | Behaviour of PVCs when the Helm release is deleted. |
-| persistence.retention.whenScaled | string | `"Delete"` | Behaviour of PVCs when the StatefulSet scales down. |
+| persistence.retention.whenScaled | string | `"Retain"` | Behaviour of PVCs when the StatefulSet scales down. |
 | persistence.selector | object | `{}` |  |
 | persistence.size | string | `"20Gi"` | Requested storage capacity for each PersistentVolumeClaim. |
 | persistence.storageClass | string | `""` | StorageClass name used for provisioning volumes; empty selects the cluster default. |
