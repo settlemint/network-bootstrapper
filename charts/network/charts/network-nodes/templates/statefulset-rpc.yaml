@@ -36,10 +36,9 @@ spec:
   {{- $initContainers := .Values.initContainers | default (dict) }}
   {{- $sharedInitContainers := get $initContainers "shared" }}
   {{- $rpcInitContainers := get $initContainers "rpc" }}
-  {{- $globalValues := (.Values.global | default (dict)) }}
-  {{- $globalSecurityContexts := dig "securityContexts" $globalValues (dict) }}
-  {{- $podSecurityContext := merge (deepCopy (default (dict) .Values.podSecurityContext)) (dig "pod" $globalSecurityContexts (dict)) }}
-  {{- $containerSecurityContext := merge (deepCopy (default (dict) .Values.securityContext)) (dig "container" $globalSecurityContexts (dict)) }}
+  {{- $securityContexts := include "nodes.securityContexts" . | fromYaml }}
+  {{- $podSecurityContext := index $securityContexts "pod" }}
+  {{- $containerSecurityContext := index $securityContexts "container" }}
   podManagementPolicy: Parallel
   replicas: {{ .Values.rpcReplicaCount }}
   serviceName: {{ include "nodes.fullname" . }}-rpc
