@@ -55,9 +55,9 @@ podDisruptionBudgets:
   validator:
     # -- Enable the validator PodDisruptionBudget.
     enabled: false
-    # -- Minimum validator pods that must remain available; ignored when maxUnavailable is set.
+    # -- Minimum validator pods that must remain available. Mutually exclusive with maxUnavailable.
     minAvailable: 1
-    # -- Maximum validator pods that can be disrupted at once. Accepts integers or percentages.
+    # -- Maximum validator pods that can be disrupted at once. Mutually exclusive with minAvailable.
     maxUnavailable:
     # -- Optional unhealthy pod eviction policy (Default or AlwaysAllow).
     unhealthyPodEvictionPolicy: ""
@@ -69,9 +69,9 @@ podDisruptionBudgets:
   rpc:
     # -- Enable the RPC PodDisruptionBudget.
     enabled: false
-    # -- Minimum RPC pods that must remain available; ignored when maxUnavailable is set.
+    # -- Minimum RPC pods that must remain available. Mutually exclusive with maxUnavailable.
     minAvailable: 1
-    # -- Maximum RPC pods that can be disrupted at once. Accepts integers or percentages.
+    # -- Maximum RPC pods that can be disrupted at once. Mutually exclusive with minAvailable.
     maxUnavailable:
     # -- Optional unhealthy pod eviction policy (Default or AlwaysAllow).
     unhealthyPodEvictionPolicy: ""

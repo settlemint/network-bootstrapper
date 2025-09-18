@@ -127,15 +127,15 @@ A Helm chart for Kubernetes
 | podDisruptionBudgets.rpc.annotations | object | `{}` | Additional annotations applied to the RPC PodDisruptionBudget. |
 | podDisruptionBudgets.rpc.enabled | bool | `false` | Enable the RPC PodDisruptionBudget. |
 | podDisruptionBudgets.rpc.labels | object | `{}` | Additional labels applied to the RPC PodDisruptionBudget. |
-| podDisruptionBudgets.rpc.maxUnavailable | string | `nil` | Maximum RPC pods that can be disrupted at once. Accepts integers or percentages. |
-| podDisruptionBudgets.rpc.minAvailable | int | `1` | Minimum RPC pods that must remain available; ignored when maxUnavailable is set. |
+| podDisruptionBudgets.rpc.maxUnavailable | string | `nil` | Maximum RPC pods that can be disrupted at once. Mutually exclusive with minAvailable. |
+| podDisruptionBudgets.rpc.minAvailable | int | `1` | Minimum RPC pods that must remain available. Mutually exclusive with maxUnavailable. |
 | podDisruptionBudgets.rpc.unhealthyPodEvictionPolicy | string | `""` | Optional unhealthy pod eviction policy (Default or AlwaysAllow). |
 | podDisruptionBudgets.validator | object | `{"annotations":{},"enabled":false,"labels":{},"maxUnavailable":null,"minAvailable":1,"unhealthyPodEvictionPolicy":""}` | PodDisruptionBudget controlling voluntary disruptions for validator pods. |
 | podDisruptionBudgets.validator.annotations | object | `{}` | Additional annotations applied to the validator PodDisruptionBudget. |
 | podDisruptionBudgets.validator.enabled | bool | `false` | Enable the validator PodDisruptionBudget. |
 | podDisruptionBudgets.validator.labels | object | `{}` | Additional labels applied to the validator PodDisruptionBudget. |
-| podDisruptionBudgets.validator.maxUnavailable | string | `nil` | Maximum validator pods that can be disrupted at once. Accepts integers or percentages. |
-| podDisruptionBudgets.validator.minAvailable | int | `1` | Minimum validator pods that must remain available; ignored when maxUnavailable is set. |
+| podDisruptionBudgets.validator.maxUnavailable | string | `nil` | Maximum validator pods that can be disrupted at once. Mutually exclusive with minAvailable. |
+| podDisruptionBudgets.validator.minAvailable | int | `1` | Minimum validator pods that must remain available. Mutually exclusive with maxUnavailable. |
 | podDisruptionBudgets.validator.unhealthyPodEvictionPolicy | string | `""` | Optional unhealthy pod eviction policy (Default or AlwaysAllow). |
 | podLabels | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
