@@ -37,7 +37,8 @@ spec:
   {{- $initContainers := .Values.initContainers | default (dict) }}
   {{- $sharedInitContainers := get $initContainers "shared" }}
   {{- $validatorInitContainers := get $initContainers "validator" }}
-  {{- $securityContexts := include "nodes.securityContexts" . | fromYaml }}
+  {{- $securityContexts := dict -}}
+  {{- include "nodes.securityContexts" (dict "ctx" . "dest" $securityContexts) -}}
   {{- $podSecurityContext := index $securityContexts "pod" }}
   {{- $containerSecurityContext := index $securityContexts "container" }}
   podManagementPolicy: Parallel

@@ -27,7 +27,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "network-bootstrapper.serviceAccountName" . }}
-      {{- $securityContexts := include "network-bootstrapper.securityContexts" . | fromYaml }}
+      {{- $securityContexts := dict -}}
+      {{- include "network-bootstrapper.securityContexts" (dict "ctx" . "dest" $securityContexts) -}}
       {{- $podSecurityContext := index $securityContexts "pod" }}
       {{- $containerSecurityContext := index $securityContexts "container" }}
       {{- if $podSecurityContext }}
