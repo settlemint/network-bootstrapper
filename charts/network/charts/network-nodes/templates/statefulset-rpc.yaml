@@ -36,6 +36,10 @@ spec:
   {{- $initContainers := .Values.initContainers | default (dict) }}
   {{- $sharedInitContainers := get $initContainers "shared" }}
   {{- $rpcInitContainers := get $initContainers "rpc" }}
+  {{- $globalValues := (.Values.global | default (dict)) }}
+  {{- $globalSecurityContexts := dig "securityContexts" $globalValues (dict) }}
+  {{- $podSecurityContext := merge (deepCopy (default (dict) .Values.podSecurityContext)) (dig "pod" $globalSecurityContexts (dict)) }}
+  {{- $containerSecurityContext := merge (deepCopy (default (dict) .Values.securityContext)) (dig "container" $globalSecurityContexts (dict)) }}
   podManagementPolicy: Parallel
   replicas: {{ .Values.rpcReplicaCount }}
   serviceName: {{ include "nodes.fullname" . }}-rpc
@@ -73,9 +77,9 @@ spec:
       {{- if $rpcPriorityClass }}
       priorityClassName: {{ $rpcPriorityClass | quote }}
       {{- end }}
-      {{- with .Values.podSecurityContext }}
+      {{- if $podSecurityContext }}
       securityContext:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $podSecurityContext | nindent 8 }}
       {{- end }}
       {{- if or $sharedInitContainers $rpcInitContainers }}
       initContainers:
@@ -97,9 +101,9 @@ spec:
 {{- if $log4jEnv }}
 {{ $log4jEnv | nindent 12 }}
 {{- end }}
-          {{- with .Values.securityContext }}
+          {{- if $containerSecurityContext }}
           securityContext:
-            {{- toYaml . | nindent 12 }}
+            {{- toYaml $containerSecurityContext | nindent 12 }}
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}

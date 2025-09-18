@@ -27,9 +27,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "network-bootstrapper.serviceAccountName" . }}
-      {{- with .Values.podSecurityContext }}
+      {{- $globalValues := (.Values.global | default (dict)) }}
+      {{- $globalSecurityContexts := dig "securityContexts" $globalValues (dict) }}
+      {{- $podSecurityContext := merge (deepCopy (default (dict) .Values.podSecurityContext)) (dig "pod" $globalSecurityContexts (dict)) }}
+      {{- $containerSecurityContext := merge (deepCopy (default (dict) .Values.securityContext)) (dig "container" $globalSecurityContexts (dict)) }}
+      {{- if $podSecurityContext }}
       securityContext:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $podSecurityContext | nindent 8 }}
       {{- end }}
       {{- with .Values.initContainers }}
       initContainers:
@@ -37,9 +41,9 @@ spec:
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          {{- with .Values.securityContext }}
+          {{- if $containerSecurityContext }}
           securityContext:
-            {{- toYaml . | nindent 12 }}
+            {{- toYaml $containerSecurityContext | nindent 12 }}
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}

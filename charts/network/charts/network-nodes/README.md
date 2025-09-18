@@ -107,7 +107,7 @@ A Helm chart for Kubernetes
 | openShiftRoute.wildcardPolicy | string | `""` | Wildcard policy controlling subdomain routing (None or Subdomain). |
 | persistence.accessModes | list | `["ReadWriteOnce"]` | Requested access modes for the PersistentVolumeClaim. |
 | persistence.annotations | object | `{}` |  |
-| persistence.enabled | bool | `false` | Enable persistent volume claims for ledger data. |
+| persistence.enabled | bool | `true` | Enable persistent volume claims for ledger data. |
 | persistence.existingClaim | string | `""` | Name of an existing PersistentVolumeClaim to reuse instead of creating new PVCs. |
 | persistence.mountPath | string | `"/data"` | Container path where the persistent volume is mounted. |
 | persistence.readOnly | bool | `false` | Mount the volume read-only when true. |
