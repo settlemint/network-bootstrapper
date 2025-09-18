@@ -11,9 +11,8 @@
   {{- $hasMin := and (hasKey $cfg "minAvailable") (ne $minRaw nil) (not (and (kindIs "string" $minRaw) (eq $minRaw ""))) -}}
   {{- $maxRaw := get $cfg "maxUnavailable" -}}
   {{- $hasMax := and (hasKey $cfg "maxUnavailable") (ne $maxRaw nil) (not (and (kindIs "string" $maxRaw) (eq $maxRaw ""))) -}}
-  {{- if and $hasMin $hasMax }}
-    {{- fail (printf "podDisruptionBudgets.%s: minAvailable and maxUnavailable are mutually exclusive" $component.name) -}}
-  {{- else if not (or $hasMin $hasMax) }}
+  {{- $effectiveHasMin := and $hasMin (not $hasMax) -}}
+  {{- if not (or $effectiveHasMin $hasMax) }}
     {{- fail (printf "podDisruptionBudgets.%s requires minAvailable or maxUnavailable" $component.name) -}}
   {{- end }}
 ---
@@ -32,7 +31,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if $hasMin }}
+  {{- if $effectiveHasMin }}
   minAvailable: {{ $minRaw }}
   {{- end }}
   {{- if $hasMax }}
