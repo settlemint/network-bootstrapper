@@ -88,6 +88,13 @@ A Helm chart for Kubernetes
 | livenessProbe.periodSeconds | int | `10` | Frequency of liveness checks in seconds. |
 | livenessProbe.timeoutSeconds | int | `2` | Timeout in seconds before marking the probe as failed. |
 | nameOverride | string | `""` | Override for the short chart name used in resource naming. |
+| networkPolicy.annotations | object | `{}` | Additional annotations to add to the NetworkPolicy metadata. |
+| networkPolicy.egress | list | `[{"ports":[{"port":53,"protocol":"UDP"}],"to":[{"namespaceSelector":{},"podSelector":{"matchLabels":{"k8s-app":"kube-dns"}}}]},{"ports":[{"port":30303,"protocol":"TCP"}],"to":[{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"besu-statefulset"}}}]},{"ports":[{"port":30303,"protocol":"TCP"}],"to":[{"namespaceSelector":{}}]}]` | NetworkPolicy egress rules. Leave empty to deny all egress when enabled. |
+| networkPolicy.enabled | bool | `false` | Create a NetworkPolicy restricting Besu pod ingress and egress. |
+| networkPolicy.ingress | list | `[{"from":[{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"txsigner"}}},{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"erpc"}}},{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"blockscout-stack"}}},{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"graph-node"}}},{"podSelector":{}}],"ports":[{"port":8545,"protocol":"TCP"},{"port":8546,"protocol":"TCP"},{"port":8547,"protocol":"TCP"},{"port":9545,"protocol":"TCP"}]},{"from":[{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"besu-statefulset"}}}],"ports":[{"port":30303,"protocol":"TCP"}]}]` | NetworkPolicy ingress rules. Leave empty to deny all ingress when enabled. |
+| networkPolicy.labels | object | `{}` | Additional labels to add to the NetworkPolicy metadata. |
+| networkPolicy.podSelector | object | `{}` | Optional override for the default pod selector; defaults to Besu workload labels when empty. |
+| networkPolicy.policyTypes | list | `[]` | Policy types enforced by the NetworkPolicy. When empty, inferred from ingress/egress rules or defaults to both. |
 | nodeSelector | object | `{}` |  |
 | openShiftRoute.alternateBackends | list | `[]` | Additional backend references to balance traffic across services. |
 | openShiftRoute.annotations | object | `{}` |  |
@@ -116,6 +123,20 @@ A Helm chart for Kubernetes
 | podAnnotations."prometheus.io/port" | string | `"9545"` | Container port value used by Prometheus to scrape metrics. |
 | podAnnotations."prometheus.io/scheme" | string | `"http"` | HTTP scheme (http or https) used for metrics scraping. |
 | podAnnotations."prometheus.io/scrape" | string | `"true"` | Enables Prometheus scraping of the Besu metrics endpoint. |
+| podDisruptionBudgets.rpc | object | `{"annotations":{},"enabled":false,"labels":{},"maxUnavailable":null,"minAvailable":1,"unhealthyPodEvictionPolicy":""}` | PodDisruptionBudget governing RPC pods. |
+| podDisruptionBudgets.rpc.annotations | object | `{}` | Additional annotations applied to the RPC PodDisruptionBudget. |
+| podDisruptionBudgets.rpc.enabled | bool | `false` | Enable the RPC PodDisruptionBudget. |
+| podDisruptionBudgets.rpc.labels | object | `{}` | Additional labels applied to the RPC PodDisruptionBudget. |
+| podDisruptionBudgets.rpc.maxUnavailable | string | `nil` | Maximum RPC pods that can be disrupted at once. Accepts integers or percentages. |
+| podDisruptionBudgets.rpc.minAvailable | int | `1` | Minimum RPC pods that must remain available; ignored when maxUnavailable is set. |
+| podDisruptionBudgets.rpc.unhealthyPodEvictionPolicy | string | `""` | Optional unhealthy pod eviction policy (Default or AlwaysAllow). |
+| podDisruptionBudgets.validator | object | `{"annotations":{},"enabled":false,"labels":{},"maxUnavailable":null,"minAvailable":1,"unhealthyPodEvictionPolicy":""}` | PodDisruptionBudget controlling voluntary disruptions for validator pods. |
+| podDisruptionBudgets.validator.annotations | object | `{}` | Additional annotations applied to the validator PodDisruptionBudget. |
+| podDisruptionBudgets.validator.enabled | bool | `false` | Enable the validator PodDisruptionBudget. |
+| podDisruptionBudgets.validator.labels | object | `{}` | Additional labels applied to the validator PodDisruptionBudget. |
+| podDisruptionBudgets.validator.maxUnavailable | string | `nil` | Maximum validator pods that can be disrupted at once. Accepts integers or percentages. |
+| podDisruptionBudgets.validator.minAvailable | int | `1` | Minimum validator pods that must remain available; ignored when maxUnavailable is set. |
+| podDisruptionBudgets.validator.unhealthyPodEvictionPolicy | string | `""` | Optional unhealthy pod eviction policy (Default or AlwaysAllow). |
 | podLabels | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
 | readinessProbe | string | `nil` |  |
