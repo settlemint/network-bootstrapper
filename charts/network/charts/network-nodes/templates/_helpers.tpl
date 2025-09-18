@@ -131,10 +131,12 @@ Accepts either a YAML string or a list of init container maps and indents output
 Resolve pod and container security contexts using global defaults plus chart overrides.
 */}}
 {{- define "nodes.securityContexts" -}}
-{{- $root := . -}}
-{{- $globalValues := ($root.Values.global | default (dict)) -}}
-{{- $globalSecurityContexts := dig "securityContexts" $globalValues (dict) -}}
-{{- $pod := mergeOverwrite (deepCopy (dig "pod" $globalSecurityContexts (dict))) (default (dict) $root.Values.podSecurityContext) -}}
-{{- $container := mergeOverwrite (deepCopy (dig "container" $globalSecurityContexts (dict))) (default (dict) $root.Values.securityContext) -}}
-{{- dict "pod" $pod "container" $container | toYaml -}}
+{{- $ctx := index . "ctx" -}}
+{{- $dest := index . "dest" -}}
+{{- $globalValues := ($ctx.Values.global | default (dict)) -}}
+{{- $globalSecurityContexts := default (dict) (get $globalValues "securityContexts") -}}
+{{- $podDefaults := default (dict) (get $globalSecurityContexts "pod") -}}
+{{- $containerDefaults := default (dict) (get $globalSecurityContexts "container") -}}
+{{- $_ := set $dest "pod" (mergeOverwrite (deepCopy $podDefaults) (default (dict) $ctx.Values.podSecurityContext)) -}}
+{{- $_ := set $dest "container" (mergeOverwrite (deepCopy $containerDefaults) (default (dict) $ctx.Values.securityContext)) -}}
 {{- end -}}
