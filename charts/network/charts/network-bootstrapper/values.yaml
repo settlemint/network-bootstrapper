@@ -3,6 +3,15 @@
 global:
   # -- (int) Chain ID applied when `settings.chainId` is unset.
   chainId:
+  labels:
+    kots.io/app-slug: settlemint-atk
+  artifacts:
+    # Image containing contract ABIs and genesis files
+    image:
+      registry:
+      repository:
+      pullPolicy:
+      tag:
 
 image:
   # -- (string) OCI registry path hosting the network bootstrapper image.
@@ -11,6 +20,14 @@ image:
   pullPolicy: IfNotPresent
   # -- (string) Image tag override; leave empty to inherit the chart appVersion.
   tag: ""
+
+artifacts:
+  # Image containing contract ABIs and genesis files
+  image:
+    registry: ghcr.io
+    repository:
+    pullPolicy: IfNotPresent
+    tag: ""
 
 # -- (list) Image pull secrets enabling access to private registries.
 imagePullSecrets: []

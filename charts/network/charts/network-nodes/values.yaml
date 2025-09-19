@@ -1,5 +1,9 @@
 # Default configuration values for the network-nodes subchart. All keys include helm-docs compatible annotations.
 
+global:
+  labels:
+    kots.io/app-slug: settlemint-atk
+
 # -- (int) Number of RPC node replicas provisioned via StatefulSet.
 rpcReplicaCount: 2
 

@@ -62,6 +62,7 @@ A Helm chart for Kubernetes
 | config.ws.maxFrameSize | int | `2097152` | Maximum WebSocket frame size in bytes. |
 | extraInitContainers | list | `[]` | Additional init containers appended verbatim to both StatefulSets. |
 | fullnameOverride | string | `"besu-node"` | Override for the fully qualified release name used in resource naming. |
+| global.labels."kots.io/app-slug" | string | `"settlemint-atk"` |  |
 | httpRoute.annotations | object | `{}` |  |
 | httpRoute.enabled | bool | `false` | Enable rendering of an HTTPRoute resource. |
 | httpRoute.hostnames | list | `["chart-example.local"]` | HTTP hostnames matched by the route. |

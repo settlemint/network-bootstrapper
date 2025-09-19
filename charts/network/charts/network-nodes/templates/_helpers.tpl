@@ -32,9 +32,19 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
-Common labels
+Common labels merged with any entries provided via global.labels.
 */}}
 {{- define "nodes.labels" -}}
+{{- $root := . -}}
+{{- $global := default (dict) (get .Values "global") -}}
+{{- $globalLabels := default (dict) (get $global "labels") -}}
+{{- range $key, $value := $globalLabels }}
+{{- if kindIs "string" $value }}
+{{ $key }}: {{ tpl $value $root | quote }}
+{{- else }}
+{{ $key }}: {{ printf "%v" $value | quote }}
+{{- end }}
+{{- end }}
 helm.sh/chart: {{ include "nodes.chart" . }}
 {{ include "nodes.selectorLabels" . }}
 {{- if .Chart.AppVersion }}

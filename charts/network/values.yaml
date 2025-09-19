@@ -22,4 +22,5 @@ global:
     pod: {}
     # -- (object) Container security context inherited by subcharts when set.
     container: {}
-
+  labels:
+    kots.io/app-slug: settlemint-atk

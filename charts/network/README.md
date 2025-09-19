@@ -21,7 +21,7 @@ A Helm chart for a blockchain network on Kubernetes
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| global | object | `{"chainId":null,"networkNodes":{"faucetArtifactPrefix":"besu-faucet","genesisConfigMapName":"besu-genesis","podPrefix":"","serviceName":"","staticNodesConfigMapName":"besu-static-nodes"},"securityContexts":{"container":{},"pod":{}}}` | Global configuration shared across subcharts. |
+| global | object | `{"chainId":null,"labels":{"kots.io/app-slug":"settlemint-atk"},"networkNodes":{"faucetArtifactPrefix":"besu-faucet","genesisConfigMapName":"besu-genesis","podPrefix":"","serviceName":"","staticNodesConfigMapName":"besu-static-nodes"},"securityContexts":{"container":{},"pod":{}}}` | Global configuration shared across subcharts. |
 | global.chainId | int | `nil` | Chain ID applied when charts omit explicit overrides. |
 | global.networkNodes | object | `{"faucetArtifactPrefix":"besu-faucet","genesisConfigMapName":"besu-genesis","podPrefix":"","serviceName":"","staticNodesConfigMapName":"besu-static-nodes"}` | Defaults consumed by Besu network node workloads. |
 | global.networkNodes.faucetArtifactPrefix | string | `"besu-faucet"` | Prefix used for faucet ConfigMaps and Secrets. |
