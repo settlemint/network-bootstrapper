@@ -15,6 +15,10 @@ A Helm chart for Kubernetes
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
+| artifacts.image.pullPolicy | string | `"IfNotPresent"` |  |
+| artifacts.image.registry | string | `"ghcr.io"` |  |
+| artifacts.image.repository | string | `nil` |  |
+| artifacts.image.tag | string | `""` |  |
 | config.bonsaiLimitTrieLogsEnabled | bool | `false` | Emit Bonsai limit trie logs for debugging state transitions. |
 | config.cacheLastBlocks | int | `1024` | Number of recent blocks cached in memory. |
 | config.dataStorageFormat | string | `"FOREST"` | Ledger storage backend (FOREST or BONSAI). |
@@ -62,6 +66,10 @@ A Helm chart for Kubernetes
 | config.ws.maxFrameSize | int | `2097152` | Maximum WebSocket frame size in bytes. |
 | extraInitContainers | list | `[]` | Additional init containers appended verbatim to both StatefulSets. |
 | fullnameOverride | string | `"besu-node"` | Override for the fully qualified release name used in resource naming. |
+| global.artifacts.image.pullPolicy | string | `nil` |  |
+| global.artifacts.image.registry | string | `nil` |  |
+| global.artifacts.image.repository | string | `nil` |  |
+| global.artifacts.image.tag | string | `nil` |  |
 | global.labels."kots.io/app-slug" | string | `"settlemint-atk"` |  |
 | httpRoute.annotations | object | `{}` |  |
 | httpRoute.enabled | bool | `false` | Enable rendering of an HTTPRoute resource. |
