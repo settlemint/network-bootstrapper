@@ -1,6 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-
+import {
+  ARTIFACT_ANNOTATION_KEY,
+  ARTIFACT_VALUES,
+} from "../../../constants/artifact-annotations.ts";
 import type {
   BesuAllocAccount,
   BesuGenesis,
@@ -16,6 +19,7 @@ import {
   createSecret,
   toAllocationConfigMapName,
 } from "../../integrations/kubernetes/kubernetes.client.ts";
+import type { AbiArtifact } from "./bootstrap.abis.ts";
 import { accent, label, muted } from "./bootstrap.colors.ts";
 
 type IndexedNode = GeneratedNodeKey & { index: number };
@@ -35,6 +39,7 @@ type OutputPayload = {
   validators: readonly IndexedNode[];
   staticNodes: readonly string[];
   artifactNames: ArtifactNames;
+  abiArtifacts: readonly AbiArtifact[];
 };
 
 type ConfigMapSpec = ConfigMapEntrySpec;
@@ -81,10 +86,27 @@ const createAllocationConfigSpecs = (
       value: `${JSON.stringify(account, null, 2)}\n`,
       immutable: true,
       onConflict: "skip" as const,
+      annotations: {
+        [ARTIFACT_ANNOTATION_KEY]: ARTIFACT_VALUES.alloc,
+      },
     });
   }
   return specs;
 };
+
+const createAbiConfigSpecs = (
+  artifacts: readonly AbiArtifact[]
+): ConfigMapSpec[] =>
+  artifacts.map((artifact) => ({
+    name: artifact.configMapName,
+    key: artifact.fileName,
+    value: artifact.contents,
+    immutable: true,
+    onConflict: "skip" as const,
+    annotations: {
+      [ARTIFACT_ANNOTATION_KEY]: ARTIFACT_VALUES.abi,
+    },
+  }));
 
 const printGroup = (title: string, nodes: readonly IndexedNode[]): void => {
   if (nodes.length === 0) {
@@ -153,7 +175,7 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
   await mkdir(directory, { recursive: true });
   logNonScreenStep(`Created ${directory}`);
 
-  const { artifactNames } = payload;
+  const { artifactNames, abiArtifacts } = payload;
   const validatorSpecs = createValidatorSpecs(
     payload.validators,
     artifactNames.validatorPrefix
@@ -191,6 +213,11 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
       path: join(directory, spec.name),
       description: spec.name,
       contents: `${JSON.stringify({ [spec.key]: spec.value }, null, 2)}\n`,
+    })),
+    ...abiArtifacts.map((artifact) => ({
+      path: join(directory, `${artifact.configMapName}.json`),
+      description: `${artifact.configMapName}.json`,
+      contents: artifact.contents,
     })),
     {
       path: join(directory, `${artifactNames.staticNodesConfigMapName}.json`),
@@ -246,6 +273,7 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
       key: "static-nodes.json",
       value: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
     },
+    ...createAbiConfigSpecs(payload.abiArtifacts),
     ...allocationSpecs,
   ];
   const secretSpecs = [

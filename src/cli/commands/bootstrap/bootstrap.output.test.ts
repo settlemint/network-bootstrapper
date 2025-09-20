@@ -4,6 +4,10 @@ import { join } from "node:path";
 
 import { type CoreV1Api, KubeConfig } from "@kubernetes/client-node";
 
+import {
+  ARTIFACT_ANNOTATION_KEY,
+  ARTIFACT_VALUES,
+} from "../../../constants/artifact-annotations.ts";
 import { ARTIFACT_DEFAULTS } from "../../../constants/artifact-defaults.ts";
 import {
   ALGORITHM,
@@ -86,7 +90,16 @@ const PUBLIC_KEY_HEX_LENGTH = 128;
 const HEX_RADIX = 16;
 const SAMPLE_VALIDATOR_INDEX = 1;
 const SAMPLE_FAUCET_INDEX = 99;
-const EXPECTED_CONFIGMAP_COUNT = 8;
+const SAMPLE_ABI_ARTIFACTS = [
+  {
+    configMapName: "abi-sample",
+    fileName: "Sample.json",
+    contents: `${JSON.stringify({ contractName: "Sample" }, null, 2)}\n`,
+  },
+] as const;
+const BASE_CONFIGMAP_COUNT = 8;
+const EXPECTED_CONFIGMAP_COUNT =
+  BASE_CONFIGMAP_COUNT + SAMPLE_ABI_ARTIFACTS.length;
 const EXPECTED_SECRET_COUNT = 2;
 const HEX_PREFIX_PATTERN = /^0x/;
 const TEST_CHAIN_ID = 1;
@@ -273,6 +286,7 @@ const samplePayload: OutputPayload = {
     genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
     staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
   },
+  abiArtifacts: SAMPLE_ABI_ARTIFACTS,
 };
 
 describe("outputResult", () => {
@@ -310,6 +324,7 @@ describe("outputResult", () => {
         "besu-node-validator-0-enode",
         "besu-node-validator-0-private-key",
         "besu-node-validator-0-pubkey",
+        "abi-sample.json",
         "besu-genesis.json",
         "besu-static-nodes.json",
       ].sort()
@@ -339,6 +354,7 @@ describe("outputResult", () => {
       namespace: string;
       name: string;
       data: Record<string, string>;
+      annotations: Record<string, string>;
       immutable?: boolean;
     }> = [];
     const createdSecrets: Array<{
@@ -376,6 +392,7 @@ describe("outputResult", () => {
               namespace,
               name: body?.metadata?.name ?? "",
               data: body?.data ?? {},
+              annotations: body?.metadata?.annotations ?? {},
               immutable: body?.immutable,
             });
             return Promise.resolve();
@@ -422,6 +439,7 @@ describe("outputResult", () => {
       expect(mapNames).toContain(
         toAllocationConfigMapName(allocationTarget.address)
       );
+      expect(mapNames).toContain(SAMPLE_ABI_ARTIFACTS[0]?.configMapName ?? "");
       expect(mapNames).not.toContain("besu-faucet-enode");
       const secretNames = createdSecrets.map((entry) => entry.name).sort();
       expect(secretNames).toEqual([
@@ -477,6 +495,19 @@ describe("outputResult", () => {
         allocationConfig?.data?.["alloc.json"] ?? "{}"
       ) as BesuAllocAccount;
       expect(parsedAllocation).toEqual(SAMPLE_EXTRA_ALLOCATION);
+      expect(allocationConfig?.annotations?.[ARTIFACT_ANNOTATION_KEY]).toBe(
+        ARTIFACT_VALUES.alloc
+      );
+      const abiConfig = createdConfigMaps.find(
+        (entry) => entry.name === SAMPLE_ABI_ARTIFACTS[0]?.configMapName
+      );
+      expect(abiConfig?.immutable).toBe(true);
+      expect(abiConfig?.annotations?.[ARTIFACT_ANNOTATION_KEY]).toBe(
+        ARTIFACT_VALUES.abi
+      );
+      expect(abiConfig?.data?.[SAMPLE_ABI_ARTIFACTS[0]?.fileName ?? ""]).toBe(
+        SAMPLE_ABI_ARTIFACTS[0]?.contents
+      );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
       (KubeConfig.prototype as any).makeApiClient = originalMake;
@@ -520,6 +551,7 @@ describe("outputResult", () => {
         "custom-faucet-address",
         "custom-faucet-pubkey",
         toAllocationConfigMapName(allocationTarget.address),
+        SAMPLE_ABI_ARTIFACTS[0]?.configMapName ?? "",
       ];
       const expectedSecrets = [
         "custom-faucet-private-key",

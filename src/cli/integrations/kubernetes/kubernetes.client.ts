@@ -24,6 +24,7 @@ type ConfigMapEntrySpec = {
   value: string;
   immutable?: boolean;
   onConflict?: "throw" | "skip";
+  annotations?: Record<string, string>;
 };
 
 type SecretEntrySpec = {
@@ -199,7 +200,10 @@ const createConfigMap = async (
   const body: V1ConfigMap = {
     data: { [spec.key]: spec.value },
     immutable: spec.immutable,
-    metadata: { name: spec.name },
+    metadata: {
+      name: spec.name,
+      annotations: spec.annotations,
+    },
   };
 
   try {

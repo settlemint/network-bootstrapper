@@ -136,6 +136,7 @@ describe("CLI command bootstrap", () => {
     const promptCalls: [string, number | undefined, number][] = [];
     const textPromptCalls: [string, string][] = [];
     let loadAllocationsPath: string | undefined;
+    let loadAbisPath: string | undefined;
     let outputInvocation:
       | {
           type: OutputType;
@@ -199,6 +200,10 @@ describe("CLI command bootstrap", () => {
           [expectedAddress(FAUCET_INDEX)]: { balance: "0x01" as const },
         } satisfies Record<string, BesuAllocAccount>);
       },
+      loadAbis: (path: string) => {
+        loadAbisPath = path;
+        return Promise.resolve([]);
+      },
       outputResult: async (type, payload) => {
         outputInvocation = { type, payload };
         await realOutputResult(type, payload);
@@ -225,17 +230,70 @@ describe("CLI command bootstrap", () => {
     expect(output).toContain("Static Nodes");
     expect(output).toContain(GENESIS_MARKER);
     expect(loadAllocationsPath).toBe("/tmp/alloc.json");
+    expect(loadAbisPath).toBeUndefined();
     expect(outputInvocation?.type).toBe("screen");
     expect(outputInvocation?.payload.staticNodes).toEqual([
       expectedStaticNodeUri(FIRST_VALIDATOR_INDEX),
       expectedStaticNodeUri(SECOND_VALIDATOR_INDEX),
     ]);
+    expect(outputInvocation?.payload.abiArtifacts).toEqual([]);
     expect(outputInvocation?.payload.artifactNames).toEqual({
       faucetPrefix: DEFAULT_FAUCET_PREFIX,
       validatorPrefix: DEFAULT_POD_PREFIX,
       genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
       staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
     });
+  });
+
+  test("runBootstrap loads ABI artifacts when directory provided", async () => {
+    const factory = createFactoryStub();
+    const abiArtifacts = [
+      {
+        configMapName: "abi-demo",
+        fileName: "Demo.json",
+        contents: `${JSON.stringify({ name: "Demo" }, null, 2)}\n`,
+      },
+    ];
+    let capturedPayload: OutputPayload | undefined;
+    let capturedAbiPath: string | undefined;
+
+    const deps: BootstrapDependencies = {
+      factory,
+      promptForCount: () => Promise.resolve(EXPECTED_DEFAULT_VALIDATOR),
+      promptForGenesis: async (_service, { faucetAddress }) => ({
+        algorithm: ALGORITHM.QBFT,
+        config: {
+          chainId: 1,
+          faucetWalletAddress: faucetAddress,
+          gasLimit: "0x1",
+          secondsPerBlock: 2,
+        },
+        genesis: { config: {}, extraData: "0x" } as any,
+      }),
+      promptForText: passthroughTextPrompt,
+      service: {} as any,
+      loadAllocations: () =>
+        Promise.resolve({} as Record<string, BesuAllocAccount>),
+      loadAbis: (path: string) => {
+        capturedAbiPath = path;
+        return Promise.resolve(abiArtifacts);
+      },
+      outputResult: (_type, payload) => {
+        capturedPayload = payload;
+        return Promise.resolve();
+      },
+    };
+
+    await runBootstrap(
+      {
+        abiDirectory: "  /opt/abis  ",
+        acceptDefaults: true,
+      },
+      deps
+    );
+
+    expect(capturedAbiPath).toBe("/opt/abis");
+    expect(capturedPayload?.abiArtifacts).toEqual(abiArtifacts);
   });
 
   test("createCliCommand wires metadata", () => {
@@ -278,6 +336,7 @@ describe("CLI command bootstrap", () => {
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      loadAbis: () => Promise.resolve([]),
       outputResult: async (type, payload) => {
         await realOutputResult(type, payload);
       },
@@ -345,6 +404,7 @@ describe("CLI command bootstrap", () => {
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      loadAbis: () => Promise.resolve([]),
       outputResult: (_type, payload) => {
         capturedPayload = payload;
         return Promise.resolve();
@@ -426,6 +486,7 @@ describe("CLI command bootstrap", () => {
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      loadAbis: () => Promise.resolve([]),
       outputResult: (_type, payload) => {
         capturedPayload = payload;
         return Promise.resolve();
@@ -494,6 +555,7 @@ describe("CLI command bootstrap", () => {
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      loadAbis: () => Promise.resolve([]),
       outputResult: async () => {
         // no-op for test
       },
@@ -576,6 +638,7 @@ describe("CLI command bootstrap", () => {
       service: {} as any,
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      loadAbis: () => Promise.resolve([]),
       outputResult: (type) => {
         capturedOutputType = type;
         return Promise.resolve();
@@ -624,6 +687,7 @@ describe("CLI command bootstrap", () => {
     const factory = createFactoryStub();
     let promptCountInvocations = 0;
     let loadAllocationsInvoked = false;
+    let loadAbisInvoked = false;
 
     const deps: BootstrapDependencies = {
       factory,
@@ -662,6 +726,10 @@ describe("CLI command bootstrap", () => {
         loadAllocationsInvoked = true;
         return Promise.resolve({} as Record<string, BesuAllocAccount>);
       },
+      loadAbis: () => {
+        loadAbisInvoked = true;
+        return Promise.resolve([]);
+      },
       outputResult: (_type, payload) => {
         expect(payload.validators).toHaveLength(EXPECTED_DEFAULT_VALIDATOR);
         expect(payload.artifactNames).toEqual({
@@ -683,5 +751,6 @@ describe("CLI command bootstrap", () => {
 
     expect(promptCountInvocations).toBe(0);
     expect(loadAllocationsInvoked).toBe(false);
+    expect(loadAbisInvoked).toBe(false);
   });
 });

@@ -19,6 +19,8 @@ Commands:
                              emit a Besu genesis.
   compile-genesis [options]  Merge per-account allocation ConfigMaps into a Besu
                              genesis file.
+  download-abi [options]     Download ABI ConfigMaps annotated with
+                             settlemint.com/artifact=abi into a local directory.
   help [command]             display help for command
 ```
 
@@ -39,6 +41,7 @@ Options:
   --faucet-artifact-prefix <prefix>      Prefix applied to faucet ConfigMaps and Secrets.
   -v, --validators <count>               Number of validator nodes to generate. (default: 4)
   -a, --allocations <file>               Path to a genesis allocations JSON file. (default: none)
+  --abi-directory <path>                 Directory containing ABI JSON files to publish as ConfigMaps.
   -o, --outputType <type>                Output target (screen, file, kubernetes). (default: "screen")
   --static-node-port <number>            P2P port used for static-nodes enode URIs. (default: 30303)
   --static-node-discovery-port <number>  Discovery port used for static-nodes enode URIs. (default: 30303)

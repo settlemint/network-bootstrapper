@@ -7,6 +7,8 @@ import {
 } from "../../../genesis/besu-genesis.service.ts";
 import { NodeKeyFactory } from "../../../keys/node-key-factory.ts";
 import { createCompileGenesisCommand } from "../compile-genesis/compile-genesis.command.ts";
+import { createDownloadAbiCommand } from "../download-abi/download-abi.command.ts";
+import { loadAbis } from "./bootstrap.abis.ts";
 import { loadAllocations } from "./bootstrap.allocations.ts";
 import {
   type HexAddress,
@@ -26,6 +28,7 @@ import {
 
 type CliOptions = {
   allocations?: string;
+  abiDirectory?: string;
   acceptDefaults?: boolean;
   chainId?: number;
   consensus?: Algorithm;
@@ -54,6 +57,7 @@ type BootstrapDependencies = {
   promptForText: typeof promptForText;
   service: BesuGenesisService;
   loadAllocations: typeof loadAllocations;
+  loadAbis: typeof loadAbis;
   outputResult: (type: OutputType, payload: OutputPayload) => Promise<void>;
 };
 
@@ -280,6 +284,7 @@ const runBootstrap = async (
   const {
     acceptDefaults = false,
     allocations,
+    abiDirectory,
     chainId,
     consensus,
     contractSizeLimit,
@@ -385,9 +390,14 @@ const runBootstrap = async (
 
   const faucetAddress: HexAddress = faucet.address;
 
+  const trimmedAbiDirectory = abiDirectory?.trim();
   const allocationOverrides = allocations
     ? await deps.loadAllocations(allocations)
     : {};
+
+  const abiArtifacts = trimmedAbiDirectory
+    ? await deps.loadAbis(trimmedAbiDirectory)
+    : [];
 
   const { genesis } = await deps.promptForGenesis(deps.service, {
     faucetAddress,
@@ -416,6 +426,7 @@ const runBootstrap = async (
       genesisConfigMapName,
       staticNodesConfigMapName,
     },
+    abiArtifacts,
   };
 
   await deps.outputResult(outputType ?? "screen", payload);
@@ -429,6 +440,7 @@ const defaultDependencies: BootstrapDependencies = {
   promptForGenesis: promptForGenesisConfig,
   service: new BesuGenesisService(),
   loadAllocations,
+  loadAbis,
   outputResult: defaultOutputResult,
 };
 /* c8 ignore end */
@@ -469,6 +481,11 @@ const createCliCommand = (
     .option(
       "-a, --allocations <file>",
       "Path to a genesis allocations JSON file. (default: none)"
+    )
+    .option(
+      "--abi-directory <path>",
+      "Directory containing ABI JSON files to publish as ConfigMaps.",
+      (value: string) => stripSurroundingQuotes(value)
     )
     .option(
       "-o, --outputType <type>",
@@ -580,6 +597,10 @@ const createCliCommand = (
           normalizedOptions.allocations === undefined
             ? undefined
             : stripSurroundingQuotes(normalizedOptions.allocations),
+        abiDirectory:
+          normalizedOptions.abiDirectory === undefined
+            ? undefined
+            : stripSurroundingQuotes(normalizedOptions.abiDirectory),
       };
 
       for (const { key, sanitize } of TEXT_OPTION_DESCRIPTORS) {
@@ -601,11 +622,18 @@ const createCliCommand = (
           undefined) as CliOptions[typeof key];
       }
 
+      if (sanitizedOptions.abiDirectory) {
+        const trimmed = sanitizedOptions.abiDirectory.trim();
+        sanitizedOptions.abiDirectory =
+          trimmed.length === 0 ? undefined : trimmed;
+      }
+
       await runBootstrap(sanitizedOptions, deps);
     });
 
   // Register subcommands from their own modules to keep the bootstrap surface composable.
   command.addCommand(createCompileGenesisCommand());
+  command.addCommand(createDownloadAbiCommand());
 
   return command;
 };
