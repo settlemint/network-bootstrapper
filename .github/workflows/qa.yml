@@ -27,7 +27,7 @@ jobs:
   qa:
     name: QA
     runs-on: namespace-profile-network-bootstrapper
-    timeout-minutes: 30
+    timeout-minutes: 10
     if: |
       github.event_name == 'push' ||
       (github.event_name == 'pull_request' && github.event.action != 'closed') ||
