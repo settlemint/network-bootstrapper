@@ -4,7 +4,9 @@ Generate node identities, configure consensus, and emit a Besu genesis.
 
 ## CLI usage
 
-```
+### Global Help
+
+```text
 Usage: network-bootstrapper [options] [command]
 
 Utilities for configuring Besu-based networks.
@@ -18,8 +20,11 @@ Commands:
   compile-genesis [options]  Merge per-account allocation ConfigMaps into a Besu
                              genesis file.
   help [command]             display help for command
+```
 
+### generate
 
+```text
 Usage: network-bootstrapper generate [options]
 
 Generate node identities, configure consensus, and emit a Besu genesis.
@@ -46,5 +51,19 @@ Options:
   --contract-size-limit <number>         Contract size limit in bytes. (default: 2147483647)
   --accept-defaults                      Accept default values for all prompts when CLI flags are omitted. (default: disabled)
   -h, --help                             display help for command
+```
 
+### compile-genesis
+
+```text
+Usage: network-bootstrapper compile-genesis [options]
+
+Merge per-account allocation ConfigMaps into a Besu genesis file.
+
+Options:
+  --genesis-configmap-name <name>  Name of the ConfigMap containing the base
+                                   genesis JSON. (default: "besu-genesis")
+  --output-path <path>             Filesystem path for the compiled genesis
+                                   output. (default: "/data/atk-genesis.json")
+  -h, --help                       display help for command
 ```

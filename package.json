@@ -27,7 +27,7 @@
     "helm": "helm upgrade --install network ./charts/network -n network --create-namespace --timeout 15m",
     "package:pack": "helm package charts/network --destination .",
     "package:push:harbor": "helm push ./network-*.tgz oci://ghcr.io/settlemint/network-bootstrapper",
-    "docs:cli": "cat README.tpl > README.md && printf '\\n```\\n' >> README.md && bun src/index.ts --help >> README.md && printf '\\n\\n' >> README.md && bun src/index.ts generate --help >> README.md && printf '\\n```\\n' >> README.md"
+    "docs:cli": "./scripts/docs-cli.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
