@@ -135,13 +135,13 @@ const fetchAbiConfigMaps = async (
     const request: {
       namespace: string;
       limit: number;
-      continue?: string;
+      _continue?: string;
     } = {
       namespace: context.namespace,
       limit: PAGE_SIZE,
     };
     if (continueToken) {
-      request.continue = continueToken;
+      request._continue = continueToken;
     }
 
     const response = await context.client.listNamespacedConfigMap(request);

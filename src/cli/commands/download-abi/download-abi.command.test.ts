@@ -39,9 +39,9 @@ const createContext = (
     listNamespacedConfigMap: (request: {
       namespace: string;
       limit?: number;
-      continue?: string;
+      _continue?: string;
     }) => {
-      if (request.continue) {
+      if (request._continue) {
         return Promise.resolve({ body: { items: [], metadata: {} } });
       }
       return Promise.resolve({
@@ -65,10 +65,10 @@ const createPaginatedContext = (
       listNamespacedConfigMap: (request: {
         namespace: string;
         limit?: number;
-        continue?: string;
+        _continue?: string;
       }) => {
         const expectedToken = tokens[callIndex];
-        const providedToken = request.continue ?? undefined;
+        const providedToken = request._continue ?? undefined;
         if (providedToken !== expectedToken) {
           throw new Error(
             `Unexpected continue token: expected ${expectedToken}, received ${providedToken}`
