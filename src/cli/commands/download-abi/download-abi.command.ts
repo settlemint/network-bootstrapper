@@ -123,6 +123,8 @@ const writeConfigMap = async (
   return written;
 };
 
+const PAGE_SIZE = 100;
+
 const fetchAbiConfigMaps = async (
   context: KubernetesClient
 ): Promise<readonly V1ConfigMap[]> => {
@@ -130,11 +132,19 @@ const fetchAbiConfigMaps = async (
   let continueToken: string | undefined;
 
   do {
-    const response = await context.client.listNamespacedConfigMap({
+    const request: {
+      namespace: string;
+      limit: number;
+      continue?: string;
+    } = {
       namespace: context.namespace,
-      limit: 100,
-      _continue: continueToken,
-    });
+      limit: PAGE_SIZE,
+    };
+    if (continueToken) {
+      request.continue = continueToken;
+    }
+
+    const response = await context.client.listNamespacedConfigMap(request);
     const items = toConfigMapList(response);
     for (const item of items) {
       const annotation = item.metadata?.annotations?.[ARTIFACT_ANNOTATION_KEY];

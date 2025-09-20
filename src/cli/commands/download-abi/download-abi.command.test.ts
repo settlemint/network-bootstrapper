@@ -36,14 +36,12 @@ const createContext = (
 ): KubernetesClient => ({
   namespace: "test-ns",
   client: {
-    listNamespacedConfigMap: ({
-      _continue,
-    }: {
+    listNamespacedConfigMap: (request: {
       namespace: string;
       limit?: number;
-      _continue?: string;
+      continue?: string;
     }) => {
-      if (_continue) {
+      if (request.continue) {
         return Promise.resolve({ body: { items: [], metadata: {} } });
       }
       return Promise.resolve({
@@ -55,6 +53,40 @@ const createContext = (
     },
   } as unknown as KubernetesClient["client"],
 });
+
+const createPaginatedContext = (
+  pages: readonly (readonly V1ConfigMap[])[],
+  tokens: readonly (string | undefined)[]
+): KubernetesClient => {
+  let callIndex = 0;
+  return {
+    namespace: "test-ns",
+    client: {
+      listNamespacedConfigMap: (request: {
+        namespace: string;
+        limit?: number;
+        continue?: string;
+      }) => {
+        const expectedToken = tokens[callIndex];
+        const providedToken = request.continue ?? undefined;
+        if (providedToken !== expectedToken) {
+          throw new Error(
+            `Unexpected continue token: expected ${expectedToken}, received ${providedToken}`
+          );
+        }
+        const items = pages[callIndex] ?? [];
+        const nextToken = tokens[callIndex + 1];
+        callIndex += 1;
+        return Promise.resolve({
+          body: {
+            items,
+            metadata: nextToken ? { continue: nextToken } : {},
+          },
+        });
+      },
+    } as unknown as KubernetesClient["client"],
+  };
+};
 
 describe("downloadAbi", () => {
   test("writes annotated configmaps to disk", async () => {
@@ -102,5 +134,46 @@ describe("downloadAbi", () => {
     const entries = await readdir(workingDirectory);
     expect(entries).toHaveLength(0);
     expect(capturedOutput).toContain("No ABI ConfigMaps found");
+  });
+
+  test("fetches all pages when the API provides a continue token", async () => {
+    const pageOne: V1ConfigMap = {
+      metadata: {
+        name: "abi-first",
+        annotations: {
+          [ARTIFACT_ANNOTATION_KEY]: ARTIFACT_VALUES.abi,
+        },
+      },
+      data: {
+        "First.json": "{}\n",
+      },
+    };
+    const pageTwo: V1ConfigMap = {
+      metadata: {
+        name: "abi-second",
+        annotations: {
+          [ARTIFACT_ANNOTATION_KEY]: ARTIFACT_VALUES.abi,
+        },
+      },
+      data: {
+        "Second.json": "{}\n",
+      },
+    };
+
+    await downloadAbi(
+      { outputDirectory: workingDirectory },
+      {
+        createContext: () =>
+          Promise.resolve(
+            createPaginatedContext(
+              [[pageOne], [pageTwo]],
+              [undefined, "page-2", undefined]
+            )
+          ),
+      }
+    );
+
+    const directories = await readdir(workingDirectory);
+    expect(directories.sort()).toEqual(["abi-first", "abi-second"]);
   });
 });
