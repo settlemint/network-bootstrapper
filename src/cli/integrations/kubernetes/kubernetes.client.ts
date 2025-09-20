@@ -18,6 +18,11 @@ type KubernetesClient = {
   namespace: string;
 };
 
+type KubernetesClientOptions = {
+  checkConfigMapAccess?: boolean;
+  checkSecretAccess?: boolean;
+};
+
 type ConfigMapEntrySpec = {
   key: string;
   name: string;
@@ -127,7 +132,10 @@ const getStatusCode = (error: unknown): number | undefined => {
   return;
 };
 
-const createKubernetesClient = async (): Promise<KubernetesClient> => {
+const createKubernetesClient = async (
+  options: KubernetesClientOptions = {}
+): Promise<KubernetesClient> => {
+  const { checkConfigMapAccess = true, checkSecretAccess = true } = options;
   Bun.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   const kubeConfig = new KubeConfig();
   try {
@@ -153,15 +161,24 @@ const createKubernetesClient = async (): Promise<KubernetesClient> => {
   }
 
   const client = kubeConfig.makeApiClient(CoreV1Api);
-  try {
-    await Promise.all([
-      client.listNamespacedConfigMap({ namespace, limit: 1 }),
-      client.listNamespacedSecret({ namespace, limit: 1 }),
-    ]);
-  } catch (error) {
-    throw new Error(
-      `Kubernetes permissions check failed: ${extractKubernetesError(error)}`
+  const readinessChecks: Promise<unknown>[] = [];
+  if (checkConfigMapAccess) {
+    readinessChecks.push(
+      client.listNamespacedConfigMap({ namespace, limit: 1 })
     );
+  }
+  if (checkSecretAccess) {
+    readinessChecks.push(client.listNamespacedSecret({ namespace, limit: 1 }));
+  }
+
+  if (readinessChecks.length > 0) {
+    try {
+      await Promise.all(readinessChecks);
+    } catch (error) {
+      throw new Error(
+        `Kubernetes permissions check failed: ${extractKubernetesError(error)}`
+      );
+    }
   }
 
   return { client, namespace };
@@ -287,7 +304,12 @@ const readConfigMap = async (
   }
 };
 
-export type { ConfigMapEntrySpec, KubernetesClient, SecretEntrySpec };
+export type {
+  ConfigMapEntrySpec,
+  KubernetesClient,
+  KubernetesClientOptions,
+  SecretEntrySpec,
+};
 export {
   createConfigMap,
   createKubernetesClient,

@@ -194,7 +194,9 @@ const compileGenesis = async ({
   genesisConfigMapName,
   outputPath,
 }: CompileGenesisOptions): Promise<void> => {
-  const context = await createKubernetesClient();
+  const context = await createKubernetesClient({
+    checkSecretAccess: false,
+  });
   const { namespace } = context;
 
   const genesisConfig = await waitForGenesisConfig(

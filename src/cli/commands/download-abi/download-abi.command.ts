@@ -149,7 +149,10 @@ const fetchAbiConfigMaps = async (
 };
 
 const defaultDependencies: DownloadAbiDependencies = {
-  createContext: createKubernetesClient,
+  createContext: () =>
+    createKubernetesClient({
+      checkSecretAccess: false,
+    }),
 };
 
 const downloadAbi = async (
