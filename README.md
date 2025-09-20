@@ -70,3 +70,17 @@ Options:
                                    output. (default: "/data/atk-genesis.json")
   -h, --help                       display help for command
 ```
+
+### download-abi
+
+```text
+Usage: network-bootstrapper download-abi [options]
+
+Download ABI ConfigMaps annotated with settlemint.com/artifact=abi into a local
+directory.
+
+Options:
+  --output-directory <path>  Directory to write ABI JSON files. (default:
+                             "/data/abi")
+  -h, --help                 display help for command
+```

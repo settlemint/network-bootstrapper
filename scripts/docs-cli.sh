@@ -28,8 +28,11 @@ append_section() {
 }
 
 # The template already ends with the CLI usage heading; start sections immediately.
+# Keep command sections grouped here so README generation stays in sync with the CLI surface.
 append_section "Global Help" bun "${ENTRYPOINT}" --help
 
 append_section "generate" bun "${ENTRYPOINT}" generate --help
 
 append_section "compile-genesis" bun "${ENTRYPOINT}" compile-genesis --help
+
+append_section "download-abi" bun "${ENTRYPOINT}" download-abi --help
