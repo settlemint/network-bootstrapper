@@ -10,6 +10,7 @@ import type {
 } from "../../../genesis/besu-genesis.service.ts";
 import {
   createKubernetesClient,
+  type KubernetesClient,
   readConfigMap,
   toAllocationConfigMapName,
 } from "../../integrations/kubernetes/kubernetes.client.ts";
@@ -17,6 +18,30 @@ import {
 const GENESIS_DATA_KEY = "genesis.json";
 const ALLOCATION_DATA_KEY = "alloc.json";
 const DEFAULT_OUTPUT_PATH = "/data/atk-genesis.json";
+const DEFAULT_GENESIS_WAIT_TIMEOUT_MS = 120_000;
+const DEFAULT_GENESIS_WAIT_INTERVAL_MS = 2000;
+const MIN_GENESIS_WAIT_INTERVAL_MS = 200;
+const MILLISECONDS_IN_SECOND = 1000;
+
+const parseDuration = (raw: string | undefined, fallback: number): number => {
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isFinite(parsed) && parsed >= 0) {
+    return parsed;
+  }
+  return fallback;
+};
+
+const GENESIS_WAIT_TIMEOUT_MS = parseDuration(
+  Bun.env.GENESIS_WAIT_TIMEOUT_MS,
+  DEFAULT_GENESIS_WAIT_TIMEOUT_MS
+);
+const GENESIS_WAIT_INTERVAL_MS = parseDuration(
+  Bun.env.GENESIS_WAIT_INTERVAL_MS,
+  DEFAULT_GENESIS_WAIT_INTERVAL_MS
+);
 
 type CompileGenesisOptions = {
   genesisConfigMapName: string;
@@ -115,6 +140,56 @@ const parseAllocationEntry = (
   return parsed;
 };
 
+const waitForGenesisConfig = async (
+  context: KubernetesClient,
+  name: string
+) => {
+  const timeout = GENESIS_WAIT_TIMEOUT_MS;
+  const interval = Math.max(
+    GENESIS_WAIT_INTERVAL_MS,
+    MIN_GENESIS_WAIT_INTERVAL_MS
+  );
+  const start = Date.now();
+  let attempts = 0;
+
+  while (attempts === 0 || Date.now() - start < timeout) {
+    attempts += 1;
+    const config = await readConfigMap(context, name);
+    if (config) {
+      if (attempts > 1) {
+        const elapsedSeconds = (
+          (Date.now() - start) /
+          MILLISECONDS_IN_SECOND
+        ).toFixed(1);
+        process.stdout.write(
+          `ConfigMap ${name} became available after ${elapsedSeconds}s (attempt ${attempts}).\n`
+        );
+      }
+      return config;
+    }
+
+    if (timeout === 0 || Date.now() - start >= timeout) {
+      return;
+    }
+
+    if (attempts === 1) {
+      const seconds = Math.round(timeout / MILLISECONDS_IN_SECOND);
+      process.stdout.write(
+        `ConfigMap ${name} not found; waiting up to ${seconds}s for it to become available.\n`
+      );
+    } else {
+      const delaySeconds = Math.round(interval / MILLISECONDS_IN_SECOND);
+      process.stdout.write(
+        `ConfigMap ${name} still unavailable; retrying in ${delaySeconds}s (attempt ${attempts}).\n`
+      );
+    }
+
+    await Bun.sleep(interval);
+  }
+
+  return;
+};
+
 const compileGenesis = async ({
   genesisConfigMapName,
   outputPath,
@@ -122,10 +197,15 @@ const compileGenesis = async ({
   const context = await createKubernetesClient();
   const { namespace } = context;
 
-  const genesisConfig = await readConfigMap(context, genesisConfigMapName);
+  const genesisConfig = await waitForGenesisConfig(
+    context,
+    genesisConfigMapName
+  );
   if (!genesisConfig) {
     throw new Error(
-      `ConfigMap ${genesisConfigMapName} not found in namespace ${namespace}.`
+      `ConfigMap ${genesisConfigMapName} not found in namespace ${namespace} after waiting up to ${Math.round(
+        GENESIS_WAIT_TIMEOUT_MS / MILLISECONDS_IN_SECOND
+      )} seconds.`
     );
   }
 

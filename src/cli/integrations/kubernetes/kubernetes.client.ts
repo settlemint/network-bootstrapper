@@ -10,6 +10,8 @@ const NAMESPACE_PATH =
 const HEX_PREFIX = "0x";
 const HTTP_CONFLICT_STATUS = 409;
 const HTTP_NOT_FOUND_STATUS = 404;
+const STATUS_CODE_PATTERN = /\b(\d{3})\b/u;
+const HTTP_CODE_MESSAGE_PATTERN = /HTTP-Code:\s*(\d{3})/u;
 
 type KubernetesClient = {
   client: CoreV1Api;
@@ -77,6 +79,48 @@ const getStatusCode = (error: unknown): number | undefined => {
     typeof (fromResponse as { status?: number }).status === "number"
   ) {
     return (fromResponse as { status?: number }).status;
+  }
+
+  const body = (
+    error as {
+      body?: {
+        status?: number;
+        statusCode?: number;
+        code?: number;
+        message?: string;
+      };
+    }
+  ).body;
+  if (body) {
+    if (typeof body.status === "number") {
+      return body.status;
+    }
+    if (typeof body.statusCode === "number") {
+      return body.statusCode;
+    }
+    if (typeof body.code === "number") {
+      return body.code;
+    }
+    if (typeof body.message === "string") {
+      const match = body.message.match(STATUS_CODE_PATTERN);
+      if (match) {
+        const parsed = Number.parseInt(match[1] ?? "", 10);
+        if (!Number.isNaN(parsed)) {
+          return parsed;
+        }
+      }
+    }
+  }
+
+  const message = (error as { message?: string }).message;
+  if (typeof message === "string") {
+    const match = message.match(HTTP_CODE_MESSAGE_PATTERN);
+    if (match) {
+      const parsed = Number.parseInt(match[1] ?? "", 10);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
   }
 
   return;
