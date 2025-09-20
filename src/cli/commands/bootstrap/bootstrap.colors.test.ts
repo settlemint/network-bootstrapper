@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { accent, label, muted, success } from "./colors.ts";
+import { accent, label, muted, success } from "./bootstrap.colors.ts";
 
 const SAMPLE = "hello";
 const RESET = "\x1b[0m";

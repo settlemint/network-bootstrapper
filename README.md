@@ -10,12 +10,14 @@ Usage: network-bootstrapper [options] [command]
 Utilities for configuring Besu-based networks.
 
 Options:
-  -h, --help          display help for command
+  -h, --help                 display help for command
 
 Commands:
-  generate [options]  Generate node identities, configure consensus, and emit a
-                      Besu genesis.
-  help [command]      display help for command
+  generate [options]         Generate node identities, configure consensus, and
+                             emit a Besu genesis.
+  compile-genesis [options]  Merge per-account allocation ConfigMaps into a Besu
+                             genesis file.
+  help [command]             display help for command
 
 
 Usage: network-bootstrapper generate [options]

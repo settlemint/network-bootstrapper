@@ -7,7 +7,7 @@ import {
   promptForCount,
   promptForInteger,
   promptForText,
-} from "./prompt-helpers.ts";
+} from "./bootstrap.prompt-helpers.ts";
 
 const PROVIDED_RESULT = 7;
 const DEFAULT_PROMPT = 2;

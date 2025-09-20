@@ -4,14 +4,23 @@ import { join } from "node:path";
 
 import { type CoreV1Api, KubeConfig } from "@kubernetes/client-node";
 
-import { ARTIFACT_DEFAULTS } from "../constants/artifact-defaults.ts";
-import type { IndexedNode, OutputPayload, OutputType } from "./output.ts";
+import { ARTIFACT_DEFAULTS } from "../../../constants/artifact-defaults.ts";
+import {
+  ALGORITHM,
+  type BesuAllocAccount,
+  BesuGenesisService,
+} from "../../../genesis/besu-genesis.service.ts";
+import type {
+  IndexedNode,
+  OutputPayload,
+  OutputType,
+} from "./bootstrap.output.ts";
 import {
   outputResult,
   printFaucet,
   printGenesis,
   printGroup,
-} from "./output.ts";
+} from "./bootstrap.output.ts";
 
 let output = "";
 let originalWrite: typeof process.stdout.write;
@@ -77,7 +86,7 @@ const PUBLIC_KEY_HEX_LENGTH = 128;
 const HEX_RADIX = 16;
 const SAMPLE_VALIDATOR_INDEX = 1;
 const SAMPLE_FAUCET_INDEX = 99;
-const EXPECTED_CONFIGMAP_COUNT = 7;
+const EXPECTED_CONFIGMAP_COUNT = 8;
 const EXPECTED_SECRET_COUNT = 2;
 const HEX_PREFIX_PATTERN = /^0x/;
 const TEST_CHAIN_ID = 1;
@@ -217,10 +226,37 @@ const staticNodeUri = (
 
 const sampleValidator = sampleNode(SAMPLE_VALIDATOR_INDEX);
 const sampleFaucet = sampleNode(SAMPLE_FAUCET_INDEX);
+const allocationTarget = sampleNode(SAMPLE_FAUCET_INDEX + 1);
+
+const SAMPLE_EXTRA_ALLOCATION: BesuAllocAccount = {
+  balance: "0x1234",
+  code: "0x6000",
+  storage: {
+    "0x1": "0x2",
+  },
+};
+
+const toAllocationConfigMapName = (address: string): string =>
+  `alloc-${address.slice(2).toLowerCase()}`;
+
+const genesisService = new BesuGenesisService(TEST_CHAIN_ID);
+const sampleGenesis = genesisService.generate(
+  ALGORITHM.QBFT,
+  {
+    chainId: TEST_CHAIN_ID,
+    faucetWalletAddress: sampleFaucet.address,
+    gasLimit: "0x1",
+    gasPrice: 0,
+    secondsPerBlock: 2,
+  },
+  {
+    [allocationTarget.address]: SAMPLE_EXTRA_ALLOCATION,
+  }
+);
 
 const samplePayload: OutputPayload = {
   faucet: sampleFaucet,
-  genesis: { config: { chainId: TEST_CHAIN_ID }, extraData: "0xabc" },
+  genesis: sampleGenesis,
   validators: [sampleValidator],
   staticNodes: [
     staticNodeUri(
@@ -252,6 +288,9 @@ describe("outputResult", () => {
     await rm("out", { recursive: true, force: true });
 
     await outputResult("file", samplePayload);
+
+    expect(output).toContain("[bootstrap] Output mode: file");
+    expect(output).toContain("[bootstrap] Writing besu-genesis.json");
 
     const directories = await readdir("out");
     expect(directories.length).toBe(1);
@@ -300,6 +339,7 @@ describe("outputResult", () => {
       namespace: string;
       name: string;
       data: Record<string, string>;
+      immutable?: boolean;
     }> = [];
     const createdSecrets: Array<{
       namespace: string;
@@ -336,6 +376,7 @@ describe("outputResult", () => {
               namespace,
               name: body?.metadata?.name ?? "",
               data: body?.data ?? {},
+              immutable: body?.immutable,
             });
             return Promise.resolve();
           },
@@ -364,6 +405,10 @@ describe("outputResult", () => {
 
       await outputResult("kubernetes", samplePayload);
 
+      expect(output).toContain("[bootstrap] Output mode: kubernetes");
+      expect(output).toContain("[bootstrap] ConfigMap → besu-genesis");
+      expect(output).toContain("[bootstrap] Secret → besu-faucet-private-key");
+
       expect(listedConfigNamespaces).toEqual(["test-namespace"]);
       expect(listedSecretNamespaces).toEqual(["test-namespace"]);
       expect(createdConfigMaps).toHaveLength(EXPECTED_CONFIGMAP_COUNT);
@@ -374,6 +419,9 @@ describe("outputResult", () => {
       expect(mapNames).toContain("besu-faucet-address");
       expect(mapNames).toContain("besu-faucet-pubkey");
       expect(mapNames).toContain("besu-static-nodes");
+      expect(mapNames).toContain(
+        toAllocationConfigMapName(allocationTarget.address)
+      );
       expect(mapNames).not.toContain("besu-faucet-enode");
       const secretNames = createdSecrets.map((entry) => entry.name).sort();
       expect(secretNames).toEqual([
@@ -391,6 +439,44 @@ describe("outputResult", () => {
       expect(
         JSON.parse(staticNodesConfig?.data?.["static-nodes.json"] ?? "[]")
       ).toEqual(samplePayload.staticNodes);
+      const genesisConfig = createdConfigMaps.find(
+        (entry) => entry.name === "besu-genesis"
+      );
+      expect(genesisConfig?.immutable).toBe(true);
+      const parsedGenesis = JSON.parse(
+        genesisConfig?.data?.["genesis.json"] ?? "{}"
+      ) as {
+        config: { chainId: number };
+        alloc?: Record<string, BesuAllocAccount>;
+      };
+      expect(parsedGenesis.config.chainId).toBe(TEST_CHAIN_ID);
+      const allocations = parsedGenesis.alloc;
+      if (!allocations) {
+        throw new Error("expected allocations payload");
+      }
+      const faucetAlloc = allocations[sampleFaucet.address];
+      if (!faucetAlloc) {
+        throw new Error("expected faucet allocation entry");
+      }
+      const expectedFaucetAlloc = sampleGenesis.alloc[sampleFaucet.address];
+      if (!expectedFaucetAlloc) {
+        throw new Error("sample genesis missing faucet entry");
+      }
+      expect(faucetAlloc.balance).toBe(expectedFaucetAlloc.balance);
+      const placeholderAlloc = allocations[allocationTarget.address];
+      if (!placeholderAlloc) {
+        throw new Error("expected placeholder allocation entry");
+      }
+      expect(placeholderAlloc.balance).toBe("0x0");
+      const allocationConfig = createdConfigMaps.find(
+        (entry) =>
+          entry.name === toAllocationConfigMapName(allocationTarget.address)
+      );
+      expect(allocationConfig?.immutable).toBe(true);
+      const parsedAllocation = JSON.parse(
+        allocationConfig?.data?.["alloc.json"] ?? "{}"
+      ) as BesuAllocAccount;
+      expect(parsedAllocation).toEqual(SAMPLE_EXTRA_ALLOCATION);
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
       (KubeConfig.prototype as any).makeApiClient = originalMake;
@@ -429,7 +515,11 @@ describe("outputResult", () => {
         "custom-genesis",
         "custom-static",
         "custom-validator-0-address",
+        "custom-validator-0-enode",
+        "custom-validator-0-pubkey",
         "custom-faucet-address",
+        "custom-faucet-pubkey",
+        toAllocationConfigMapName(allocationTarget.address),
       ];
       const expectedSecrets = [
         "custom-faucet-private-key",

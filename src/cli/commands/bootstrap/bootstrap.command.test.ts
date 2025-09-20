@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { getAddress } from "viem";
-import { ARTIFACT_DEFAULTS } from "../constants/artifact-defaults.ts";
-import type { BesuAllocAccount } from "../genesis/besu-genesis.service.ts";
-import { ALGORITHM } from "../genesis/besu-genesis.service.ts";
-import type { GeneratedNodeKey } from "../keys/node-key-factory.ts";
-import type { BootstrapDependencies, CliOptions } from "./build-command.ts";
-import { createCliCommand, runBootstrap } from "./build-command.ts";
-import type { OutputPayload, OutputType } from "./output.ts";
-import { outputResult as realOutputResult } from "./output.ts";
+import { ARTIFACT_DEFAULTS } from "../../../constants/artifact-defaults.ts";
+import type { BesuAllocAccount } from "../../../genesis/besu-genesis.service.ts";
+import { ALGORITHM } from "../../../genesis/besu-genesis.service.ts";
+import type { GeneratedNodeKey } from "../../../keys/node-key-factory.ts";
+import type { BootstrapDependencies, CliOptions } from "./bootstrap.command.ts";
+import { createCliCommand, runBootstrap } from "./bootstrap.command.ts";
+import type { OutputPayload, OutputType } from "./bootstrap.output.ts";
+import { outputResult as realOutputResult } from "./bootstrap.output.ts";
 
 const VALIDATOR_LABEL = "validator nodes";
 const VALIDATOR_RETURN = 2;

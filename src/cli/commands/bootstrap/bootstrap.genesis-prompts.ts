@@ -7,14 +7,14 @@ import {
   type BesuGenesis,
   type BesuGenesisService,
   type BesuNetworkConfig,
-} from "../genesis/besu-genesis.service.ts";
-import { accent } from "./colors.ts";
+} from "../../../genesis/besu-genesis.service.ts";
+import { accent } from "./bootstrap.colors.ts";
 import {
   ABORT_MESSAGE,
   ABORT_OPTION,
   promptForBigIntString,
   promptForInteger,
-} from "./prompt-helpers.ts";
+} from "./bootstrap.prompt-helpers.ts";
 
 const HEX_RADIX = 16;
 

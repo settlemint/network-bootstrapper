@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { getAddress } from "viem";
 
-import { loadAllocations } from "./allocations.ts";
+import { loadAllocations } from "./bootstrap.allocations.ts";
 
 const INVALID_JSON_ERROR = /Allocations file is not valid JSON/;
 const INVALID_ADDRESS_ERROR = /Invalid address/;

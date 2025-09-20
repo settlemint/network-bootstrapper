@@ -1,10 +1,22 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { V1ConfigMap, V1Secret } from "@kubernetes/client-node";
-import { CoreV1Api, KubeConfig } from "@kubernetes/client-node";
 
-import type { GeneratedNodeKey } from "../keys/node-key-factory.ts";
-import { accent, label } from "./colors.ts";
+import type {
+  BesuAllocAccount,
+  BesuGenesis,
+} from "../../../genesis/besu-genesis.service.ts";
+import type { GeneratedNodeKey } from "../../../keys/node-key-factory.ts";
+import type {
+  ConfigMapEntrySpec,
+  SecretEntrySpec,
+} from "../../integrations/kubernetes/kubernetes.client.ts";
+import {
+  createConfigMap,
+  createKubernetesClient,
+  createSecret,
+  toAllocationConfigMapName,
+} from "../../integrations/kubernetes/kubernetes.client.ts";
+import { accent, label, muted } from "./bootstrap.colors.ts";
 
 type IndexedNode = GeneratedNodeKey & { index: number };
 
@@ -19,25 +31,60 @@ type ArtifactNames = {
 
 type OutputPayload = {
   faucet: GeneratedNodeKey;
-  genesis: unknown;
+  genesis: BesuGenesis;
   validators: readonly IndexedNode[];
   staticNodes: readonly string[];
   artifactNames: ArtifactNames;
 };
 
-type ConfigMapSpec = {
-  key: string;
-  name: string;
-  value: string;
-};
-
-type SecretSpec = ConfigMapSpec;
+type ConfigMapSpec = ConfigMapEntrySpec;
+type SecretSpec = SecretEntrySpec;
 
 const OUTPUT_DIR = "out";
-const NAMESPACE_PATH =
-  "/var/run/secrets/kubernetes.io/serviceaccount/namespace";
 const MILLISECOND_PAD_WIDTH = 3;
-const HTTP_CONFLICT_STATUS = 409;
+const ZERO_BALANCE = "0x0";
+
+const logNonScreenStep = (message: string): void => {
+  process.stdout.write(`${muted(`[bootstrap] ${message}`)}\n`);
+};
+
+const addressesEqual = (left: string, right: string): boolean =>
+  left.toLowerCase() === right.toLowerCase();
+
+const createSparseAlloc = (
+  alloc: Record<string, BesuAllocAccount>,
+  faucetAddress: string
+): Record<string, BesuAllocAccount> => {
+  const sparse: Record<string, BesuAllocAccount> = {};
+  for (const [address, account] of Object.entries(alloc)) {
+    if (addressesEqual(address, faucetAddress)) {
+      sparse[address] = account;
+      continue;
+    }
+    sparse[address] = { balance: ZERO_BALANCE };
+  }
+  return sparse;
+};
+
+const createAllocationConfigSpecs = (
+  alloc: Record<string, BesuAllocAccount>,
+  faucetAddress: string
+): ConfigMapSpec[] => {
+  const specs: ConfigMapSpec[] = [];
+  for (const [address, account] of Object.entries(alloc)) {
+    if (addressesEqual(address, faucetAddress)) {
+      continue;
+    }
+    specs.push({
+      name: toAllocationConfigMapName(address),
+      key: "alloc.json",
+      value: `${JSON.stringify(account, null, 2)}\n`,
+      immutable: true,
+      onConflict: "skip" as const,
+    });
+  }
+  return specs;
+};
 
 const printGroup = (title: string, nodes: readonly IndexedNode[]): void => {
   if (nodes.length === 0) {
@@ -100,9 +147,11 @@ const formatTimestampForDirectory = (date: Date): string => {
 };
 
 const outputToFile = async (payload: OutputPayload): Promise<string> => {
+  logNonScreenStep("Preparing filesystem output directory");
   const timestamp = formatTimestampForDirectory(new Date());
   const directory = join(OUTPUT_DIR, timestamp);
   await mkdir(directory, { recursive: true });
+  logNonScreenStep(`Created ${directory}`);
 
   const { artifactNames } = payload;
   const validatorSpecs = createValidatorSpecs(
@@ -128,30 +177,55 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
     },
   ];
 
-  const writes: Promise<number>[] = [
-    Bun.write(
-      join(directory, `${artifactNames.genesisConfigMapName}.json`),
-      `${JSON.stringify(payload.genesis, null, 2)}\n`
-    ),
-    ...[...validatorSpecs, ...faucetSpecs].map((spec) =>
-      Bun.write(
-        join(directory, spec.name),
-        `${JSON.stringify({ [spec.key]: spec.value }, null, 2)}\n`
-      )
-    ),
-    Bun.write(
-      join(directory, `${artifactNames.staticNodesConfigMapName}.json`),
-      `${JSON.stringify(payload.staticNodes, null, 2)}\n`
-    ),
+  const fileEntries: Array<{
+    path: string;
+    description: string;
+    contents: string;
+  }> = [
+    {
+      path: join(directory, `${artifactNames.genesisConfigMapName}.json`),
+      description: `${artifactNames.genesisConfigMapName}.json`,
+      contents: `${JSON.stringify(payload.genesis, null, 2)}\n`,
+    },
+    ...[...validatorSpecs, ...faucetSpecs].map((spec) => ({
+      path: join(directory, spec.name),
+      description: spec.name,
+      contents: `${JSON.stringify({ [spec.key]: spec.value }, null, 2)}\n`,
+    })),
+    {
+      path: join(directory, `${artifactNames.staticNodesConfigMapName}.json`),
+      description: `${artifactNames.staticNodesConfigMapName}.json`,
+      contents: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
+    },
   ];
 
-  await Promise.all(writes);
+  for (const entry of fileEntries) {
+    logNonScreenStep(`Writing ${entry.description}`);
+  }
+
+  await Promise.all(
+    fileEntries.map((entry) => Bun.write(entry.path, entry.contents))
+  );
   return directory;
 };
 
 const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
-  const { client, namespace } = await createKubernetesClient();
+  const context = await createKubernetesClient();
+  const { namespace } = context;
+  logNonScreenStep(`Using Kubernetes namespace ${namespace}`);
   const { artifactNames } = payload;
+  const sparseAlloc = createSparseAlloc(
+    payload.genesis.alloc,
+    payload.faucet.address
+  );
+  const minimalGenesis: BesuGenesis = {
+    ...payload.genesis,
+    alloc: sparseAlloc,
+  };
+  const allocationSpecs = createAllocationConfigSpecs(
+    payload.genesis.alloc,
+    payload.faucet.address
+  );
   const validatorSpecs = createValidatorSpecs(
     payload.validators,
     artifactNames.validatorPrefix
@@ -163,26 +237,45 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
     {
       name: artifactNames.genesisConfigMapName,
       key: "genesis.json",
-      value: JSON.stringify(payload.genesis, null, 2),
+      value: `${JSON.stringify(minimalGenesis, null, 2)}\n`,
+      immutable: true,
+      onConflict: "skip" as const,
     },
     {
       name: artifactNames.staticNodesConfigMapName,
       key: "static-nodes.json",
-      value: JSON.stringify(payload.staticNodes, null, 2),
+      value: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
     },
+    ...allocationSpecs,
   ];
   const secretSpecs = [
     ...allSpecs.filter((spec) => spec.key === "privateKey"),
     ...createFaucetSecretSpecs(payload.faucet, artifactNames.faucetPrefix),
   ];
 
-  await Promise.all([
-    ...configMapSpecs.map((spec) => upsertConfigMap(client, namespace, spec)),
-    ...secretSpecs.map((spec) => upsertSecret(client, namespace, spec)),
-  ]);
+  logNonScreenStep(
+    `Applying ${configMapSpecs.length} ConfigMap specs and ${secretSpecs.length} Secret specs`
+  );
+
+  for (const spec of configMapSpecs) {
+    logNonScreenStep(`ConfigMap → ${spec.name}`);
+  }
+  for (const spec of secretSpecs) {
+    logNonScreenStep(`Secret → ${spec.name}`);
+  }
+
+  const createdConfigMaps = await Promise.all(
+    configMapSpecs.map((spec) => createConfigMap(context, spec))
+  );
+  const createdSecrets = await Promise.all(
+    secretSpecs.map((spec) => createSecret(context, spec))
+  );
+
+  const configMapCount = createdConfigMaps.filter(Boolean).length;
+  const secretCount = createdSecrets.filter(Boolean).length;
 
   process.stdout.write(
-    `Applied ${configMapSpecs.length} ConfigMaps and ${secretSpecs.length} Secrets in namespace ${namespace}.\n`
+    `Applied ${configMapCount} ConfigMaps and ${secretCount} Secrets in namespace ${namespace}.\n`
   );
 };
 
@@ -225,150 +318,6 @@ const createFaucetSecretSpecs = (
   },
 ];
 
-const createKubernetesClient = async (): Promise<{
-  client: CoreV1Api;
-  namespace: string;
-}> => {
-  Bun.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-  const kubeConfig = new KubeConfig();
-  try {
-    kubeConfig.loadFromCluster();
-  } catch (_error) {
-    throw new Error(
-      "Kubernetes output requires running inside a cluster with service account credentials."
-    );
-  }
-
-  const namespaceFile = Bun.file(NAMESPACE_PATH);
-  let namespace: string;
-  try {
-    namespace = (await namespaceFile.text()).trim();
-  } catch (_error) {
-    throw new Error(
-      "Unable to determine Kubernetes namespace from service account credentials."
-    );
-  }
-
-  if (namespace.length === 0) {
-    throw new Error("Kubernetes namespace could not be determined.");
-  }
-
-  const client = kubeConfig.makeApiClient(CoreV1Api);
-  try {
-    await Promise.all([
-      client.listNamespacedConfigMap({ namespace, limit: 1 }),
-      client.listNamespacedSecret({ namespace, limit: 1 }),
-    ]);
-  } catch (error) {
-    throw new Error(
-      `Kubernetes permissions check failed: ${extractKubernetesError(error)}`
-    );
-  }
-
-  return { client, namespace };
-};
-
-const upsertConfigMap = async (
-  client: CoreV1Api,
-  namespace: string,
-  spec: ConfigMapSpec
-): Promise<void> => {
-  const body: V1ConfigMap = {
-    data: { [spec.key]: spec.value },
-    metadata: { name: spec.name },
-  };
-
-  try {
-    await client.createNamespacedConfigMap({ namespace, body });
-  } catch (error) {
-    if (getStatusCode(error) === HTTP_CONFLICT_STATUS) {
-      throw new Error(
-        `ConfigMap ${spec.name} already exists. Delete it or choose a different output target.`
-      );
-    }
-
-    throw new Error(
-      `Failed to create ConfigMap ${spec.name}: ${extractKubernetesError(error)}`
-    );
-  }
-};
-
-const upsertSecret = async (
-  client: CoreV1Api,
-  namespace: string,
-  spec: SecretSpec
-): Promise<void> => {
-  const body: V1Secret = {
-    metadata: { name: spec.name },
-    stringData: { [spec.key]: spec.value },
-    type: "Opaque",
-  };
-
-  try {
-    await client.createNamespacedSecret({ namespace, body });
-  } catch (error) {
-    if (getStatusCode(error) === HTTP_CONFLICT_STATUS) {
-      throw new Error(
-        `Secret ${spec.name} already exists. Delete it or choose a different output target.`
-      );
-    }
-
-    throw new Error(
-      `Failed to create Secret ${spec.name}: ${extractKubernetesError(error)}`
-    );
-  }
-};
-
-const extractKubernetesError = (error: unknown): string => {
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (error && typeof error === "object") {
-    const withMessage = error as { message?: string };
-    if (typeof withMessage.message === "string") {
-      return withMessage.message;
-    }
-    const withBody = error as { body?: { message?: string } };
-    if (withBody.body?.message) {
-      return withBody.body.message;
-    }
-  }
-
-  return "unknown error";
-};
-
-const getStatusCode = (error: unknown): number | undefined => {
-  if (!error || typeof error !== "object") {
-    return;
-  }
-
-  const fromTopLevel = (error as { statusCode?: number }).statusCode;
-  if (typeof fromTopLevel === "number") {
-    return fromTopLevel;
-  }
-
-  const topLevelStatus = (error as { status?: number }).status;
-  if (typeof topLevelStatus === "number") {
-    return topLevelStatus;
-  }
-
-  const fromResponse = (error as { response?: { statusCode?: number } })
-    .response;
-  if (fromResponse && typeof fromResponse.statusCode === "number") {
-    return fromResponse.statusCode;
-  }
-
-  if (
-    fromResponse &&
-    typeof (fromResponse as { status?: number }).status === "number"
-  ) {
-    return (fromResponse as { status?: number }).status;
-  }
-
-  return;
-};
-
 const outputResult = async (
   type: OutputType,
   payload: OutputPayload
@@ -379,12 +328,14 @@ const outputResult = async (
   }
 
   if (type === "file") {
+    logNonScreenStep("Output mode: file");
     const directory = await outputToFile(payload);
     process.stdout.write(`Wrote bootstrap artifacts to ${directory}.\n`);
     return;
   }
 
   if (type === "kubernetes") {
+    logNonScreenStep("Output mode: kubernetes");
     await outputToKubernetes(payload);
     return;
   }

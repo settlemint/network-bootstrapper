@@ -1,4 +1,4 @@
-import { createCliCommand } from "./cli/build-command.ts";
+import { createCliCommand } from "./cli/commands/bootstrap/bootstrap.command.ts";
 
 const runCli = async (): Promise<void> => {
   try {

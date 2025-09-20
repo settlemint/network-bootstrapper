@@ -1,7 +1,7 @@
 import { input as inputPrompt } from "@inquirer/prompts";
 import { InvalidArgumentError } from "commander";
 
-import { accent } from "./colors.ts";
+import { accent } from "./bootstrap.colors.ts";
 
 const ABORT_OPTION = "▌" as const;
 const ABORT_MESSAGE = `Prompt aborted via ${ABORT_OPTION}. Provide CLI flags to skip interactivity.`;

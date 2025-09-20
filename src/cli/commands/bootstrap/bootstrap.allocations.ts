@@ -1,7 +1,7 @@
 import { getAddress, isAddress, isHex } from "viem";
 import { z } from "zod";
 
-import type { BesuAllocAccount } from "../genesis/besu-genesis.service.ts";
+import type { BesuAllocAccount } from "../../../genesis/besu-genesis.service.ts";
 
 type HexLiteral = `0x${string}`;
 

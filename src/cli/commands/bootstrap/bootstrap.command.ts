@@ -1,24 +1,28 @@
 import { Command, InvalidArgumentError } from "commander";
-import { ARTIFACT_DEFAULTS } from "../constants/artifact-defaults.ts";
+import { ARTIFACT_DEFAULTS } from "../../../constants/artifact-defaults.ts";
 import {
   ALGORITHM,
   type Algorithm,
   BesuGenesisService,
-} from "../genesis/besu-genesis.service.ts";
-import { NodeKeyFactory } from "../keys/node-key-factory.ts";
-import { loadAllocations } from "./allocations.ts";
-import { type HexAddress, promptForGenesisConfig } from "./genesis-prompts.ts";
+} from "../../../genesis/besu-genesis.service.ts";
+import { NodeKeyFactory } from "../../../keys/node-key-factory.ts";
+import { createCompileGenesisCommand } from "../compile-genesis/compile-genesis.command.ts";
+import { loadAllocations } from "./bootstrap.allocations.ts";
+import {
+  type HexAddress,
+  promptForGenesisConfig,
+} from "./bootstrap.genesis-prompts.ts";
 import {
   outputResult as defaultOutputResult,
   type IndexedNode,
   type OutputPayload,
   type OutputType,
-} from "./output.ts";
+} from "./bootstrap.output.ts";
 import {
   createCountParser,
   promptForCount,
   promptForText,
-} from "./prompt-helpers.ts";
+} from "./bootstrap.prompt-helpers.ts";
 
 type CliOptions = {
   allocations?: string;
@@ -599,6 +603,9 @@ const createCliCommand = (
 
       await runBootstrap(sanitizedOptions, deps);
     });
+
+  // Register subcommands from their own modules to keep the bootstrap surface composable.
+  command.addCommand(createCompileGenesisCommand());
 
   return command;
 };

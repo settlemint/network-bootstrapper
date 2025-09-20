@@ -6,12 +6,12 @@ import {
   type BesuAllocAccount,
   type BesuGenesis,
   type BesuGenesisService,
-} from "../genesis/besu-genesis.service.ts";
+} from "../../../genesis/besu-genesis.service.ts";
 import {
   type HexAddress,
   type PromptOverrides,
   promptForGenesisConfig,
-} from "./genesis-prompts.ts";
+} from "./bootstrap.genesis-prompts.ts";
 
 const CHAIN_ID_RESPONSE = 42;
 const BLOCK_TIME_RESPONSE = 5;
