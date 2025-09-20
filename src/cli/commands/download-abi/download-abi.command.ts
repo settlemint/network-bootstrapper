@@ -14,7 +14,7 @@ import {
 } from "../../integrations/kubernetes/kubernetes.client.ts";
 
 const DEFAULT_OUTPUT_DIRECTORY = "/data/abi";
-const CONTINUE_TOKEN_FIELD = "continue";
+const CONTINUE_TOKEN_FIELDS = ["_continue", "continue"] as const;
 const SAFE_FILENAME_PATTERN = /[\\/]/g;
 
 type CommanderOptions = {
@@ -64,15 +64,12 @@ const getContinueToken = (payload: unknown): string | undefined => {
   }
 
   const source = "body" in payload && payload.body ? payload.body : payload;
-  if (
-    source &&
-    typeof (source as { metadata?: { continue?: string } }).metadata?.[
-      CONTINUE_TOKEN_FIELD
-    ] === "string"
-  ) {
-    return (source as { metadata: { continue: string } }).metadata[
-      CONTINUE_TOKEN_FIELD
-    ];
+  for (const field of CONTINUE_TOKEN_FIELDS) {
+    const candidate = (source as { metadata?: Record<string, unknown> })
+      .metadata?.[field];
+    if (typeof candidate === "string" && candidate.length > 0) {
+      return candidate;
+    }
   }
   return;
 };
@@ -123,8 +120,6 @@ const writeConfigMap = async (
   return written;
 };
 
-const PAGE_SIZE = 100;
-
 const fetchAbiConfigMaps = async (
   context: KubernetesClient
 ): Promise<readonly V1ConfigMap[]> => {
@@ -134,11 +129,9 @@ const fetchAbiConfigMaps = async (
   do {
     const request: {
       namespace: string;
-      limit: number;
       _continue?: string;
     } = {
       namespace: context.namespace,
-      limit: PAGE_SIZE,
     };
     if (continueToken) {
       request._continue = continueToken;

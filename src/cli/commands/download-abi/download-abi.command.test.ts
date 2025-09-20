@@ -80,7 +80,9 @@ const createPaginatedContext = (
         return Promise.resolve({
           body: {
             items,
-            metadata: nextToken ? { continue: nextToken } : {},
+            metadata: nextToken
+              ? { continue: nextToken, _continue: nextToken }
+              : {},
           },
         });
       },
