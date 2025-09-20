@@ -126,7 +126,7 @@ jobs:
 
       - name: Run docs
         if: github.event_name == 'pull_request' || github.event_name == 'push'
-        run: bun run docs:helm && bun run docs:cli
+        run: bun run docs:cli
 
       # Commit generated version metadata and README updates on release tags
       - name: Auto-commit release assets
