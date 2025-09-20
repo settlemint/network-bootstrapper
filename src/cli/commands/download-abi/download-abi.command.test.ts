@@ -15,6 +15,10 @@ import { downloadAbi } from "./download-abi.command.ts";
 let capturedOutput = "";
 let originalWrite: typeof process.stdout.write;
 let workingDirectory: string;
+const EXPECTED_LIMIT = 100;
+const RESOURCE_EXPIRED_STATUS = 410;
+const RATE_LIMIT_STATUS = 429;
+const noopPause = async () => Promise.resolve();
 
 beforeEach(async () => {
   originalWrite = process.stdout.write;
@@ -31,17 +35,33 @@ afterEach(async () => {
   await rm(workingDirectory, { recursive: true, force: true });
 });
 
+const readToken = (request: Record<string, unknown>): string | undefined => {
+  const current = (request as { _continue?: unknown })._continue;
+  if (typeof current === "string" && current.length > 0) {
+    const legacy = (request as { continue?: unknown }).continue;
+    if (legacy !== undefined && legacy !== current) {
+      throw new Error(
+        `Legacy continue token mismatch: expected ${current}, received ${legacy}`
+      );
+    }
+    return current;
+  }
+  const legacy = (request as { continue?: unknown }).continue;
+  return typeof legacy === "string" && legacy.length > 0 ? legacy : undefined;
+};
+
 const createContext = (
   configMaps: readonly V1ConfigMap[]
 ): KubernetesClient => ({
   namespace: "test-ns",
   client: {
-    listNamespacedConfigMap: (request: {
-      namespace: string;
-      limit?: number;
-      _continue?: string;
-    }) => {
-      if (request._continue) {
+    listNamespacedConfigMap: (request: Record<string, unknown>) => {
+      if ((request as { limit?: number }).limit !== EXPECTED_LIMIT) {
+        throw new Error(
+          `Expected limit ${EXPECTED_LIMIT}, received ${(request as { limit?: number }).limit}`
+        );
+      }
+      if (readToken(request)) {
         return Promise.resolve({ body: { items: [], metadata: {} } });
       }
       return Promise.resolve({
@@ -62,13 +82,14 @@ const createPaginatedContext = (
   return {
     namespace: "test-ns",
     client: {
-      listNamespacedConfigMap: (request: {
-        namespace: string;
-        limit?: number;
-        _continue?: string;
-      }) => {
+      listNamespacedConfigMap: (request: Record<string, unknown>) => {
+        if ((request as { limit?: number }).limit !== EXPECTED_LIMIT) {
+          throw new Error(
+            `Expected limit ${EXPECTED_LIMIT}, received ${(request as { limit?: number }).limit}`
+          );
+        }
         const expectedToken = tokens[callIndex];
-        const providedToken = request._continue ?? undefined;
+        const providedToken = readToken(request);
         if (providedToken !== expectedToken) {
           throw new Error(
             `Unexpected continue token: expected ${expectedToken}, received ${providedToken}`
@@ -106,7 +127,10 @@ describe("downloadAbi", () => {
 
     await downloadAbi(
       { outputDirectory: workingDirectory },
-      { createContext: () => Promise.resolve(createContext([configMap])) }
+      {
+        createContext: () => Promise.resolve(createContext([configMap])),
+        pause: noopPause,
+      }
     );
 
     const filePath = join(workingDirectory, "abi-sample", "Sample.json");
@@ -130,7 +154,10 @@ describe("downloadAbi", () => {
 
     await downloadAbi(
       { outputDirectory: workingDirectory },
-      { createContext: () => Promise.resolve(createContext([configMap])) }
+      {
+        createContext: () => Promise.resolve(createContext([configMap])),
+        pause: noopPause,
+      }
     );
 
     const entries = await readdir(workingDirectory);
@@ -172,10 +199,133 @@ describe("downloadAbi", () => {
               [undefined, "page-2", undefined]
             )
           ),
+        pause: noopPause,
       }
     );
 
     const directories = await readdir(workingDirectory);
     expect(directories.sort()).toEqual(["abi-first", "abi-second"]);
+  });
+
+  test("restarts pagination when Kubernetes expires the snapshot", async () => {
+    const configMap: V1ConfigMap = {
+      metadata: {
+        name: "abi-retry",
+        annotations: {
+          [ARTIFACT_ANNOTATION_KEY]: ARTIFACT_VALUES.abi,
+        },
+      },
+      data: {
+        "Retry.json": "{}\n",
+      },
+    };
+
+    let callCount = 0;
+    const context: KubernetesClient = {
+      namespace: "test-ns",
+      client: {
+        listNamespacedConfigMap: (request: Record<string, unknown>) => {
+          callCount += 1;
+          if ((request as { limit?: number }).limit !== EXPECTED_LIMIT) {
+            throw new Error(
+              `Expected limit ${EXPECTED_LIMIT}, received ${(request as { limit?: number }).limit}`
+            );
+          }
+
+          if (callCount === 1) {
+            const error = new Error("Expired snapshot") as Error & {
+              statusCode?: number;
+            };
+            error.statusCode = RESOURCE_EXPIRED_STATUS;
+            return Promise.reject(error);
+          }
+
+          if (readToken(request)) {
+            throw new Error(
+              "Continue token should not be provided after resnapshot"
+            );
+          }
+
+          return Promise.resolve({
+            body: {
+              items: [configMap],
+              metadata: {},
+            },
+          });
+        },
+      } as unknown as KubernetesClient["client"],
+    };
+
+    await downloadAbi(
+      { outputDirectory: workingDirectory },
+      {
+        createContext: () => Promise.resolve(context),
+        pause: noopPause,
+      }
+    );
+
+    const directories = await readdir(workingDirectory);
+    expect(directories).toEqual(["abi-retry"]);
+    expect(callCount).toBe(2);
+  });
+
+  test("retries when the API rate limits requests", async () => {
+    const configMap: V1ConfigMap = {
+      metadata: {
+        name: "abi-throttle",
+        annotations: {
+          [ARTIFACT_ANNOTATION_KEY]: ARTIFACT_VALUES.abi,
+        },
+      },
+      data: {
+        "Throttle.json": "{}\n",
+      },
+    };
+
+    let callIndex = 0;
+    const context: KubernetesClient = {
+      namespace: "test-ns",
+      client: {
+        listNamespacedConfigMap: (request: Record<string, unknown>) => {
+          if ((request as { limit?: number }).limit !== EXPECTED_LIMIT) {
+            throw new Error(
+              `Expected limit ${EXPECTED_LIMIT}, received ${(request as { limit?: number }).limit}`
+            );
+          }
+
+          callIndex += 1;
+          if (callIndex === 1) {
+            const error = new Error("Too Many Requests") as Error & {
+              statusCode?: number;
+            };
+            error.statusCode = RATE_LIMIT_STATUS;
+            return Promise.reject(error);
+          }
+
+          if (readToken(request)) {
+            throw new Error("Unexpected continue token on successful retry");
+          }
+
+          return Promise.resolve({
+            body: {
+              items: [configMap],
+              metadata: {},
+            },
+          });
+        },
+      } as unknown as KubernetesClient["client"],
+    };
+
+    await downloadAbi(
+      { outputDirectory: workingDirectory },
+      {
+        createContext: () => Promise.resolve(context),
+        pause: noopPause,
+      }
+    );
+
+    const directories = await readdir(workingDirectory);
+    expect(directories).toEqual(["abi-throttle"]);
+    expect(callIndex).toBe(2);
   });
 });

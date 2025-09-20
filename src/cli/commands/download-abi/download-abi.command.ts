@@ -10,12 +10,48 @@ import {
 } from "../../../constants/artifact-annotations.ts";
 import {
   createKubernetesClient,
+  extractKubernetesError,
+  getStatusCode,
   type KubernetesClient,
 } from "../../integrations/kubernetes/kubernetes.client.ts";
 
 const DEFAULT_OUTPUT_DIRECTORY = "/data/abi";
+const PAGE_SIZE = 100;
+const RESOURCE_EXPIRED_STATUS = 410;
+const HTTP_TOO_MANY_REQUESTS = 429;
+const HTTP_INTERNAL_SERVER_ERROR = 500;
+const HTTP_BAD_GATEWAY = 502;
+const HTTP_SERVICE_UNAVAILABLE = 503;
+const HTTP_GATEWAY_TIMEOUT = 504;
+const RETRYABLE_STATUS_CODES = new Set([
+  HTTP_TOO_MANY_REQUESTS,
+  HTTP_INTERNAL_SERVER_ERROR,
+  HTTP_BAD_GATEWAY,
+  HTTP_SERVICE_UNAVAILABLE,
+  HTTP_GATEWAY_TIMEOUT,
+]);
+const MAX_PAGE_RETRY_ATTEMPTS = 5;
+const MAX_RESNAPSHOT_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 100;
 const CONTINUE_TOKEN_FIELDS = ["_continue", "continue"] as const;
 const SAFE_FILENAME_PATTERN = /[\\/]/g;
+
+type ListConfigMapRequest = Parameters<
+  KubernetesClient["client"]["listNamespacedConfigMap"]
+>[0];
+
+type ListConfigMapResponse = Awaited<
+  ReturnType<KubernetesClient["client"]["listNamespacedConfigMap"]>
+>;
+
+type ConfigMapListMetadata = {
+  continueToken?: string;
+};
+
+type DownloadStatistics = {
+  configMaps: number;
+  files: number;
+};
 
 type CommanderOptions = {
   outputDirectory?: string;
@@ -27,51 +63,54 @@ type DownloadAbiOptions = {
 
 type DownloadAbiDependencies = {
   createContext: () => Promise<KubernetesClient>;
+  pause: (milliseconds: number) => Promise<void>;
+};
+
+type ConfigMapListPayload = {
+  items?: readonly V1ConfigMap[];
+  metadata?: Record<string, unknown>;
+};
+
+const extractListPayload = (payload: unknown): ConfigMapListPayload => {
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+
+  if ("body" in payload && payload.body) {
+    const body = (payload as { body?: ConfigMapListPayload }).body;
+    if (body && typeof body === "object") {
+      return body;
+    }
+  }
+
+  if ("items" in payload || "metadata" in payload) {
+    return payload as ConfigMapListPayload;
+  }
+
+  return {};
 };
 
 const toConfigMapList = (payload: unknown): readonly V1ConfigMap[] => {
-  if (!payload) {
-    return [];
-  }
-
-  const list = ((): {
-    items?: readonly V1ConfigMap[];
-    metadata?: { continue?: string };
-  } => {
-    if (typeof payload === "object") {
-      if ("body" in payload && payload.body) {
-        return payload.body as {
-          items?: readonly V1ConfigMap[];
-          metadata?: { continue?: string };
-        };
-      }
-      if ("items" in payload) {
-        return payload as {
-          items?: readonly V1ConfigMap[];
-          metadata?: { continue?: string };
-        };
-      }
-    }
-    return {};
-  })();
-
-  return list.items ?? [];
+  const list = extractListPayload(payload);
+  return Array.isArray(list.items) ? list.items : [];
 };
 
-const getContinueToken = (payload: unknown): string | undefined => {
-  if (!payload || typeof payload !== "object") {
-    return;
+const getListMetadata = (payload: unknown): ConfigMapListMetadata => {
+  const list = extractListPayload(payload);
+  const metadata = list.metadata;
+  if (!metadata || typeof metadata !== "object") {
+    return {};
   }
 
-  const source = "body" in payload && payload.body ? payload.body : payload;
+  const record = metadata as Record<string, unknown>;
   for (const field of CONTINUE_TOKEN_FIELDS) {
-    const candidate = (source as { metadata?: Record<string, unknown> })
-      .metadata?.[field];
+    const candidate = record[field];
     if (typeof candidate === "string" && candidate.length > 0) {
-      return candidate;
+      return { continueToken: candidate };
     }
   }
-  return;
+
+  return {};
 };
 
 const ensureDirectory = async (path: string): Promise<void> => {
@@ -120,35 +159,89 @@ const writeConfigMap = async (
   return written;
 };
 
-const fetchAbiConfigMaps = async (
-  context: KubernetesClient
-): Promise<readonly V1ConfigMap[]> => {
-  const abis: V1ConfigMap[] = [];
+const syncAbiConfigMaps = async (
+  context: KubernetesClient,
+  baseDirectory: string,
+  pause: DownloadAbiDependencies["pause"]
+): Promise<DownloadStatistics> => {
   let continueToken: string | undefined;
+  let retryAttempts = 0;
+  let resnapshotAttempts = 0;
+  const seenTokens = new Set<string>();
+  const totals: DownloadStatistics = { configMaps: 0, files: 0 };
 
-  do {
-    const request: {
-      namespace: string;
-      _continue?: string;
-    } = {
+  for (;;) {
+    const request = {
       namespace: context.namespace,
-    };
+      limit: PAGE_SIZE,
+    } as ListConfigMapRequest & Record<string, unknown>;
+
     if (continueToken) {
       request._continue = continueToken;
+      request.continue = continueToken;
     }
 
-    const response = await context.client.listNamespacedConfigMap(request);
+    let response: ListConfigMapResponse;
+    try {
+      response = await context.client.listNamespacedConfigMap(request);
+      retryAttempts = 0;
+      resnapshotAttempts = 0;
+    } catch (error) {
+      const statusCode = getStatusCode(error);
+      if (statusCode === RESOURCE_EXPIRED_STATUS) {
+        resnapshotAttempts += 1;
+        if (resnapshotAttempts > MAX_RESNAPSHOT_ATTEMPTS) {
+          throw new Error(
+            "Failed to download ABI ConfigMaps after repeated resource snapshot expirations."
+          );
+        }
+        continueToken = undefined;
+        seenTokens.clear();
+        await pause(RETRY_BASE_DELAY_MS * resnapshotAttempts);
+        continue;
+      }
+
+      if (
+        statusCode &&
+        RETRYABLE_STATUS_CODES.has(statusCode) &&
+        retryAttempts < MAX_PAGE_RETRY_ATTEMPTS
+      ) {
+        retryAttempts += 1;
+        await pause(RETRY_BASE_DELAY_MS * 2 ** (retryAttempts - 1));
+        continue;
+      }
+
+      throw new Error(
+        `Failed to list ABI ConfigMaps: ${extractKubernetesError(error)}`
+      );
+    }
+
     const items = toConfigMapList(response);
     for (const item of items) {
       const annotation = item.metadata?.annotations?.[ARTIFACT_ANNOTATION_KEY];
-      if (annotation === ARTIFACT_VALUES.abi) {
-        abis.push(item);
+      if (annotation !== ARTIFACT_VALUES.abi) {
+        continue;
       }
-    }
-    continueToken = getContinueToken(response);
-  } while (continueToken);
 
-  return abis;
+      const filesWritten = await writeConfigMap(baseDirectory, item);
+      totals.configMaps += 1;
+      totals.files += filesWritten;
+    }
+
+    const { continueToken: nextToken } = getListMetadata(response);
+    if (!nextToken) {
+      return totals;
+    }
+
+    if (seenTokens.has(nextToken)) {
+      throw new Error(
+        `Detected repeated Kubernetes pagination token ${nextToken}; aborting to avoid an infinite loop.`
+      );
+    }
+
+    seenTokens.add(nextToken);
+    continueToken = nextToken;
+  }
 };
 
 const defaultDependencies: DownloadAbiDependencies = {
@@ -156,6 +249,8 @@ const defaultDependencies: DownloadAbiDependencies = {
     createKubernetesClient({
       checkSecretAccess: false,
     }),
+  pause: async (milliseconds: number) =>
+    new Promise((resolve) => setTimeout(resolve, milliseconds)),
 };
 
 const downloadAbi = async (
@@ -169,19 +264,19 @@ const downloadAbi = async (
   );
   await ensureDirectory(sanitizedDirectory);
 
-  const configMaps = await fetchAbiConfigMaps(context);
-  if (configMaps.length === 0) {
+  const { configMaps, files } = await syncAbiConfigMaps(
+    context,
+    sanitizedDirectory,
+    deps.pause
+  );
+
+  if (configMaps === 0) {
     process.stdout.write("[download-abi] No ABI ConfigMaps found.\n");
     return;
   }
 
-  let totalFiles = 0;
-  for (const configMap of configMaps) {
-    totalFiles += await writeConfigMap(sanitizedDirectory, configMap);
-  }
-
   process.stdout.write(
-    `[download-abi] Synced ${configMaps.length} ConfigMaps with ${totalFiles} files.\n`
+    `[download-abi] Synced ${configMaps} ConfigMaps with ${files} files.\n`
   );
 };
 
