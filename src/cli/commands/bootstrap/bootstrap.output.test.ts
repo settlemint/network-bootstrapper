@@ -25,6 +25,7 @@ import {
   printGenesis,
   printGroup,
 } from "./bootstrap.output.ts";
+import { SUBGRAPH_HASH_KEY } from "./bootstrap.subgraph.ts";
 
 let output = "";
 let originalWrite: typeof process.stdout.write;
@@ -97,7 +98,9 @@ const SAMPLE_ABI_ARTIFACTS = [
     contents: `${JSON.stringify({ contractName: "Sample" }, null, 2)}\n`,
   },
 ] as const;
-const BASE_CONFIGMAP_COUNT = 8;
+const SAMPLE_SUBGRAPH_HASH =
+  "bafybeigdyrztzd4gufq2bdsd6we3jh7uzulnd2ipkyli5sto6f5j6rlude";
+const BASE_CONFIGMAP_COUNT = 9;
 const EXPECTED_CONFIGMAP_COUNT =
   BASE_CONFIGMAP_COUNT + SAMPLE_ABI_ARTIFACTS.length;
 const EXPECTED_SECRET_COUNT = 2;
@@ -285,8 +288,10 @@ const samplePayload: OutputPayload = {
     validatorPrefix: DEFAULT_POD_PREFIX,
     genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
     staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+    subgraphConfigMapName: ARTIFACT_DEFAULTS.subgraphConfigMapName,
   },
   abiArtifacts: SAMPLE_ABI_ARTIFACTS,
+  subgraphHash: SAMPLE_SUBGRAPH_HASH,
 };
 
 describe("outputResult", () => {
@@ -327,6 +332,7 @@ describe("outputResult", () => {
         "abi-sample.json",
         "besu-genesis.json",
         "besu-static-nodes.json",
+        "besu-subgraph.json",
       ].sort()
     );
 
@@ -341,6 +347,14 @@ describe("outputResult", () => {
       "utf8"
     );
     expect(JSON.parse(staticNodesContent)).toEqual(samplePayload.staticNodes);
+
+    const subgraphConfig = await readFile(
+      join(targetDirPath, "besu-subgraph.json"),
+      "utf8"
+    );
+    expect(JSON.parse(subgraphConfig)).toEqual({
+      [SUBGRAPH_HASH_KEY]: SAMPLE_SUBGRAPH_HASH,
+    });
 
     await rm("out", { recursive: true, force: true });
   });
@@ -436,6 +450,7 @@ describe("outputResult", () => {
       expect(mapNames).toContain("besu-faucet-address");
       expect(mapNames).toContain("besu-faucet-pubkey");
       expect(mapNames).toContain("besu-static-nodes");
+      expect(mapNames).toContain("besu-subgraph");
       expect(mapNames).toContain(
         toAllocationConfigMapName(allocationTarget.address)
       );
@@ -508,6 +523,13 @@ describe("outputResult", () => {
       expect(abiConfig?.data?.[SAMPLE_ABI_ARTIFACTS[0]?.fileName ?? ""]).toBe(
         SAMPLE_ABI_ARTIFACTS[0]?.contents
       );
+      const subgraphConfig = createdConfigMaps.find(
+        (entry) => entry.name === "besu-subgraph"
+      );
+      expect(subgraphConfig?.immutable).toBe(true);
+      expect(subgraphConfig?.data?.[SUBGRAPH_HASH_KEY]).toBe(
+        SAMPLE_SUBGRAPH_HASH
+      );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
       (KubeConfig.prototype as any).makeApiClient = originalMake;
@@ -526,6 +548,7 @@ describe("outputResult", () => {
           validatorPrefix: "custom-validator",
           genesisConfigMapName: "custom-genesis",
           staticNodesConfigMapName: "custom-static",
+          subgraphConfigMapName: "custom-subgraph",
         },
         staticNodes: [
           staticNodeUri(
@@ -550,6 +573,7 @@ describe("outputResult", () => {
         "custom-validator-0-pubkey",
         "custom-faucet-address",
         "custom-faucet-pubkey",
+        "custom-subgraph",
         toAllocationConfigMapName(allocationTarget.address),
         SAMPLE_ABI_ARTIFACTS[0]?.configMapName ?? "",
       ];

@@ -25,6 +25,7 @@ import {
   promptForCount,
   promptForText,
 } from "./bootstrap.prompt-helpers.ts";
+import { loadSubgraphHash } from "./bootstrap.subgraph.ts";
 
 type CliOptions = {
   allocations?: string;
@@ -48,6 +49,7 @@ type CliOptions = {
   genesisConfigmapName?: string;
   staticNodesConfigmapName?: string;
   faucetArtifactPrefix?: string;
+  subgraphHashFile?: string;
 };
 
 type BootstrapDependencies = {
@@ -58,6 +60,7 @@ type BootstrapDependencies = {
   service: BesuGenesisService;
   loadAllocations: typeof loadAllocations;
   loadAbis: typeof loadAbis;
+  loadSubgraphHash: typeof loadSubgraphHash;
   outputResult: (type: OutputType, payload: OutputPayload) => Promise<void>;
 };
 
@@ -69,6 +72,7 @@ const {
   genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
   staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
   faucetArtifactPrefix: DEFAULT_FAUCET_ARTIFACT_PREFIX,
+  subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,
 } = ARTIFACT_DEFAULTS;
 const OUTPUT_CHOICES: OutputType[] = ["screen", "file", "kubernetes"];
 const LEADING_DOT_REGEX = /^\./u;
@@ -303,6 +307,7 @@ const runBootstrap = async (
     genesisConfigmapName: genesisConfigmapNameOption,
     staticNodesConfigmapName: staticNodesConfigmapNameOption,
     faucetArtifactPrefix: faucetArtifactPrefixOption,
+    subgraphHashFile: subgraphHashFileOption,
   } = options;
 
   const resolveCount = (
@@ -399,6 +404,22 @@ const runBootstrap = async (
     ? await deps.loadAbis(trimmedAbiDirectory)
     : [];
 
+  const envSubgraphHashFile = Bun.env.SUBGRAPH_HASH_FILE?.trim();
+  const providedSubgraphHashFile =
+    subgraphHashFileOption === undefined
+      ? undefined
+      : subgraphHashFileOption.trim();
+  let subgraphHashPath: string | undefined;
+  if (providedSubgraphHashFile && providedSubgraphHashFile.length > 0) {
+    subgraphHashPath = providedSubgraphHashFile;
+  } else if (envSubgraphHashFile && envSubgraphHashFile.length > 0) {
+    subgraphHashPath = envSubgraphHashFile;
+  }
+
+  const subgraphHash = subgraphHashPath
+    ? await deps.loadSubgraphHash(subgraphHashPath)
+    : undefined;
+
   const { genesis } = await deps.promptForGenesis(deps.service, {
     faucetAddress,
     allocations: allocationOverrides,
@@ -425,8 +446,10 @@ const runBootstrap = async (
       validatorPrefix: staticNodePodPrefix,
       genesisConfigMapName,
       staticNodesConfigMapName,
+      subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,
     },
     abiArtifacts,
+    subgraphHash,
   };
 
   await deps.outputResult(outputType ?? "screen", payload);
@@ -441,6 +464,7 @@ const defaultDependencies: BootstrapDependencies = {
   service: new BesuGenesisService(),
   loadAllocations,
   loadAbis,
+  loadSubgraphHash,
   outputResult: defaultOutputResult,
 };
 /* c8 ignore end */
@@ -485,6 +509,11 @@ const createCliCommand = (
     .option(
       "--abi-directory <path>",
       "Directory containing ABI JSON files to publish as ConfigMaps.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
+      "--subgraph-hash-file <path>",
+      "Path to a file containing the subgraph IPFS hash.",
       (value: string) => stripSurroundingQuotes(value)
     )
     .option(
@@ -601,6 +630,10 @@ const createCliCommand = (
           normalizedOptions.abiDirectory === undefined
             ? undefined
             : stripSurroundingQuotes(normalizedOptions.abiDirectory),
+        subgraphHashFile:
+          normalizedOptions.subgraphHashFile === undefined
+            ? undefined
+            : stripSurroundingQuotes(normalizedOptions.subgraphHashFile),
       };
 
       for (const { key, sanitize } of TEXT_OPTION_DESCRIPTORS) {
@@ -625,6 +658,12 @@ const createCliCommand = (
       if (sanitizedOptions.abiDirectory) {
         const trimmed = sanitizedOptions.abiDirectory.trim();
         sanitizedOptions.abiDirectory =
+          trimmed.length === 0 ? undefined : trimmed;
+      }
+
+      if (sanitizedOptions.subgraphHashFile) {
+        const trimmed = sanitizedOptions.subgraphHashFile.trim();
+        sanitizedOptions.subgraphHashFile =
           trimmed.length === 0 ? undefined : trimmed;
       }
 

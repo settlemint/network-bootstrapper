@@ -23,6 +23,7 @@ const {
   genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
   staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
   faucetArtifactPrefix: DEFAULT_FAUCET_PREFIX,
+  subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,
 } = ARTIFACT_DEFAULTS;
 const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
 const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
@@ -35,6 +36,8 @@ const PUBLIC_KEY_REPEAT = 64;
 const FIRST_VALIDATOR_INDEX = 1;
 const SECOND_VALIDATOR_INDEX = 2;
 const FAUCET_INDEX = VALIDATOR_RETURN + 1;
+const SAMPLE_SUBGRAPH_HASH =
+  "bafybeigdyrztzd4gufq2bdsd6we3jh7uzulnd2ipkyli5sto6f5j6rlude";
 const createFactoryStub = () => {
   let counter = 0;
   return {
@@ -204,6 +207,7 @@ describe("CLI command bootstrap", () => {
         loadAbisPath = path;
         return Promise.resolve([]);
       },
+      loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
       outputResult: async (type, payload) => {
         outputInvocation = { type, payload };
         await realOutputResult(type, payload);
@@ -242,6 +246,7 @@ describe("CLI command bootstrap", () => {
       validatorPrefix: DEFAULT_POD_PREFIX,
       genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
       staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+      subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,
     });
   });
 
@@ -278,6 +283,7 @@ describe("CLI command bootstrap", () => {
         capturedAbiPath = path;
         return Promise.resolve(abiArtifacts);
       },
+      loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
       outputResult: (_type, payload) => {
         capturedPayload = payload;
         return Promise.resolve();
@@ -294,6 +300,56 @@ describe("CLI command bootstrap", () => {
 
     expect(capturedAbiPath).toBe("/opt/abis");
     expect(capturedPayload?.abiArtifacts).toEqual(abiArtifacts);
+  });
+
+  test("runBootstrap loads subgraph hash from environment", async () => {
+    const factory = createFactoryStub();
+    let capturedPath: string | undefined;
+    let capturedPayload: OutputPayload | undefined;
+    const originalEnv = Bun.env.SUBGRAPH_HASH_FILE;
+
+    const deps: BootstrapDependencies = {
+      factory,
+      promptForCount: () => Promise.resolve(EXPECTED_DEFAULT_VALIDATOR),
+      promptForGenesis: async (_service, { faucetAddress }) => ({
+        algorithm: ALGORITHM.QBFT,
+        config: {
+          chainId: 1,
+          faucetWalletAddress: faucetAddress,
+          gasLimit: "0x1",
+          secondsPerBlock: 2,
+        },
+        genesis: { config: {}, extraData: "0x" } as any,
+      }),
+      promptForText: passthroughTextPrompt,
+      service: {} as any,
+      loadAllocations: () =>
+        Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+      loadAbis: () => Promise.resolve([]),
+      loadSubgraphHash: (path: string) => {
+        capturedPath = path;
+        return Promise.resolve(SAMPLE_SUBGRAPH_HASH);
+      },
+      outputResult: (_type, payload) => {
+        capturedPayload = payload;
+        return Promise.resolve();
+      },
+    };
+
+    Bun.env.SUBGRAPH_HASH_FILE = "  /tmp/subgraph.txt  ";
+
+    try {
+      await runBootstrap({ acceptDefaults: true }, deps);
+    } finally {
+      if (originalEnv === undefined) {
+        Bun.env.SUBGRAPH_HASH_FILE = undefined;
+      } else {
+        Bun.env.SUBGRAPH_HASH_FILE = originalEnv;
+      }
+    }
+
+    expect(capturedPath).toBe("/tmp/subgraph.txt");
+    expect(capturedPayload?.subgraphHash).toBe(SAMPLE_SUBGRAPH_HASH);
   });
 
   test("createCliCommand wires metadata", () => {
@@ -337,6 +393,7 @@ describe("CLI command bootstrap", () => {
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
       loadAbis: () => Promise.resolve([]),
+      loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
       outputResult: async (type, payload) => {
         await realOutputResult(type, payload);
       },
@@ -405,6 +462,7 @@ describe("CLI command bootstrap", () => {
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
       loadAbis: () => Promise.resolve([]),
+      loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
       outputResult: (_type, payload) => {
         capturedPayload = payload;
         return Promise.resolve();
@@ -457,6 +515,7 @@ describe("CLI command bootstrap", () => {
       validatorPrefix: "custom-validator",
       genesisConfigMapName: "custom-genesis",
       staticNodesConfigMapName: "custom-static-nodes",
+      subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,
     });
   });
 
@@ -487,6 +546,7 @@ describe("CLI command bootstrap", () => {
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
       loadAbis: () => Promise.resolve([]),
+      loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
       outputResult: (_type, payload) => {
         capturedPayload = payload;
         return Promise.resolve();
@@ -556,6 +616,7 @@ describe("CLI command bootstrap", () => {
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
       loadAbis: () => Promise.resolve([]),
+      loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
       outputResult: async () => {
         // no-op for test
       },
@@ -639,6 +700,7 @@ describe("CLI command bootstrap", () => {
       loadAllocations: () =>
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
       loadAbis: () => Promise.resolve([]),
+      loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
       outputResult: (type) => {
         capturedOutputType = type;
         return Promise.resolve();
@@ -730,6 +792,7 @@ describe("CLI command bootstrap", () => {
         loadAbisInvoked = true;
         return Promise.resolve([]);
       },
+      loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
       outputResult: (_type, payload) => {
         expect(payload.validators).toHaveLength(EXPECTED_DEFAULT_VALIDATOR);
         expect(payload.artifactNames).toEqual({
@@ -737,6 +800,7 @@ describe("CLI command bootstrap", () => {
           validatorPrefix: DEFAULT_POD_PREFIX,
           genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
           staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
+          subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,
         });
         return Promise.resolve();
       },

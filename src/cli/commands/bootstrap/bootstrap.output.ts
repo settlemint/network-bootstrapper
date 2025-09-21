@@ -21,6 +21,7 @@ import {
 } from "../../integrations/kubernetes/kubernetes.client.ts";
 import type { AbiArtifact } from "./bootstrap.abis.ts";
 import { accent, label, muted } from "./bootstrap.colors.ts";
+import { SUBGRAPH_HASH_KEY } from "./bootstrap.subgraph.ts";
 
 type IndexedNode = GeneratedNodeKey & { index: number };
 
@@ -31,6 +32,7 @@ type ArtifactNames = {
   validatorPrefix: string;
   genesisConfigMapName: string;
   staticNodesConfigMapName: string;
+  subgraphConfigMapName: string;
 };
 
 type OutputPayload = {
@@ -40,6 +42,7 @@ type OutputPayload = {
   staticNodes: readonly string[];
   artifactNames: ArtifactNames;
   abiArtifacts: readonly AbiArtifact[];
+  subgraphHash?: string;
 };
 
 type ConfigMapSpec = ConfigMapEntrySpec;
@@ -226,6 +229,18 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
     },
   ];
 
+  if (payload.subgraphHash) {
+    fileEntries.push({
+      path: join(directory, `${artifactNames.subgraphConfigMapName}.json`),
+      description: `${artifactNames.subgraphConfigMapName}.json`,
+      contents: `${JSON.stringify(
+        { [SUBGRAPH_HASH_KEY]: payload.subgraphHash },
+        null,
+        2
+      )}\n`,
+    });
+  }
+
   for (const entry of fileEntries) {
     logNonScreenStep(`Writing ${entry.description}`);
   }
@@ -276,6 +291,15 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
     ...createAbiConfigSpecs(payload.abiArtifacts),
     ...allocationSpecs,
   ];
+  if (payload.subgraphHash) {
+    configMapSpecs.push({
+      name: artifactNames.subgraphConfigMapName,
+      key: SUBGRAPH_HASH_KEY,
+      value: payload.subgraphHash,
+      immutable: true,
+      onConflict: "skip",
+    });
+  }
   const secretSpecs = [
     ...allSpecs.filter((spec) => spec.key === "privateKey"),
     ...createFaucetSecretSpecs(payload.faucet, artifactNames.faucetPrefix),

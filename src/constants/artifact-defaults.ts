@@ -4,6 +4,7 @@ const ARTIFACT_DEFAULTS = {
   genesisConfigMapName: "besu-genesis",
   staticNodesConfigMapName: "besu-static-nodes",
   faucetArtifactPrefix: "besu-faucet",
+  subgraphConfigMapName: "besu-subgraph",
 } as const;
 
 export { ARTIFACT_DEFAULTS };
