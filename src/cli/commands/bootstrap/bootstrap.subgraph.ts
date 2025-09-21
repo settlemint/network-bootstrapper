@@ -1,6 +1,6 @@
 import { CID } from "multiformats/cid";
 
-const SUBGRAPH_HASH_KEY = "SUBGRAPH_HASH" as const;
+const SUBGRAPH_HASH_KEY = "SUBGRAPH" as const;
 
 const loadSubgraphHash = async (path: string): Promise<string> => {
   const trimmedPath = path.trim();

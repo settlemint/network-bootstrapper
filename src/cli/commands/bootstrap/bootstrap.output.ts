@@ -234,7 +234,7 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
       path: join(directory, `${artifactNames.subgraphConfigMapName}.json`),
       description: `${artifactNames.subgraphConfigMapName}.json`,
       contents: `${JSON.stringify(
-        { [SUBGRAPH_HASH_KEY]: payload.subgraphHash },
+        { [SUBGRAPH_HASH_KEY]: `kit:${payload.subgraphHash}` },
         null,
         2
       )}\n`,
