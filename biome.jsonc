@@ -6,6 +6,9 @@
   },
   "linter": {
     "rules": {
+      "style": {
+        "useNamingConvention": "warn"
+      },
       "suspicious": {
         "noConsole": "off"
       },
