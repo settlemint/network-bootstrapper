@@ -118,7 +118,7 @@ const promptForGenesisConfig = async (
 
   const defaults = createDefaultNetworkSettings();
 
-  const fallbackAlgorithm = ALGORITHM.QBFT;
+  const fallbackAlgorithm = ALGORITHM.qbft;
 
   let resolvedAlgorithm: Algorithm;
   if (preset?.algorithm) {

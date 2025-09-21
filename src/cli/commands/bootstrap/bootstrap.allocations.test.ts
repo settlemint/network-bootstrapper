@@ -55,7 +55,7 @@ describe("loadAllocations", () => {
   });
 
   test("throws on invalid address", async () => {
-    const allocations = { INVALID: { balance: "0x01" } };
+    const allocations = { invalidAddress: { balance: "0x01" } };
     const { dir, path } = createTempFile(JSON.stringify(allocations));
 
     await expect(loadAllocations(path)).rejects.toThrow(INVALID_ADDRESS_ERROR);

@@ -127,7 +127,7 @@ describe("promptForGenesisConfig", () => {
         `${EVM_STACK_SIZE}`,
         `${CONTRACT_SIZE_LIMIT}`,
       ],
-      algorithm: "IBFTv2",
+      algorithm: "ibftV2",
     });
 
     const result = await promptForGenesisConfig(
@@ -140,7 +140,7 @@ describe("promptForGenesisConfig", () => {
       }
     );
 
-    expect(result.algorithm).toBe(ALGORITHM.IBFTv2);
+    expect(result.algorithm).toBe(ALGORITHM.ibftV2);
     expect(result.config.chainId).toBe(CHAIN_ID_RESPONSE);
     expect(result.config.secondsPerBlock).toBe(BLOCK_TIME_RESPONSE);
     expect(result.config.gasPrice).toBe(GAS_PRICE_RESPONSE);
@@ -168,7 +168,7 @@ describe("promptForGenesisConfig", () => {
         `${EVM_STACK_SIZE}`,
         `${CONTRACT_SIZE_LIMIT}`,
       ],
-      algorithm: "QBFT",
+      algorithm: "qbft",
     });
 
     const result = await promptForGenesisConfig(
@@ -181,14 +181,14 @@ describe("promptForGenesisConfig", () => {
       }
     );
 
-    expect(result.algorithm).toBe(ALGORITHM.QBFT);
+    expect(result.algorithm).toBe(ALGORITHM.qbft);
     expect(result.config.gasPrice).toBeUndefined();
   });
 
   test("uses preset values without prompting", async () => {
     const { service } = createServiceStub();
     const preset = {
-      algorithm: ALGORITHM.QBFT,
+      algorithm: ALGORITHM.qbft,
       chainId: 6543,
       secondsPerBlock: 7,
       gasLimit: "123456789",
@@ -221,7 +221,7 @@ describe("promptForGenesisConfig", () => {
       }
     );
 
-    expect(result.algorithm).toBe(ALGORITHM.QBFT);
+    expect(result.algorithm).toBe(ALGORITHM.qbft);
     expect(result.config.chainId).toBe(preset.chainId);
     expect(result.config.secondsPerBlock).toBe(preset.secondsPerBlock);
     expect(result.config.gasLimit).toBe(
@@ -256,7 +256,7 @@ describe("promptForGenesisConfig", () => {
         allocations: {} as Record<string, BesuAllocAccount>,
         faucetAddress: faucet,
         preset: {
-          algorithm: ALGORITHM.IBFTv2,
+          algorithm: ALGORITHM.ibftV2,
           chainId: NEGATIVE_PRESET_INT,
           secondsPerBlock: NEGATIVE_PRESET_INT,
           gasLimit: NEGATIVE_BIG_VALUE,
@@ -276,7 +276,7 @@ describe("promptForGenesisConfig", () => {
         allocations: {} as Record<string, BesuAllocAccount>,
         faucetAddress: faucet,
         preset: {
-          algorithm: ALGORITHM.QBFT,
+          algorithm: ALGORITHM.qbft,
           chainId: 1,
           secondsPerBlock: 1,
           gasLimit: "1000",
@@ -296,7 +296,7 @@ describe("promptForGenesisConfig", () => {
         allocations: {} as Record<string, BesuAllocAccount>,
         faucetAddress: faucet,
         preset: {
-          algorithm: ALGORITHM.IBFTv2,
+          algorithm: ALGORITHM.ibftV2,
           chainId: 1,
           secondsPerBlock: 1,
           gasLimit: "-5",
@@ -316,7 +316,7 @@ describe("promptForGenesisConfig", () => {
         allocations: {} as Record<string, BesuAllocAccount>,
         faucetAddress: faucet,
         preset: {
-          algorithm: ALGORITHM.IBFTv2,
+          algorithm: ALGORITHM.ibftV2,
           chainId: 1,
           secondsPerBlock: 1,
           gasLimit: NON_NUMERIC_BIG_VALUE,
@@ -361,7 +361,7 @@ describe("promptForGenesisConfig", () => {
 
       const expectedChainId =
         Math.floor(RANDOM_HALF * CHAIN_ID_RANGE) + MIN_CHAIN_ID;
-      expect(result.algorithm).toBe(ALGORITHM.QBFT);
+      expect(result.algorithm).toBe(ALGORITHM.qbft);
       expect(result.config.chainId).toBe(expectedChainId);
       expect(result.config.secondsPerBlock).toBe(2);
       expect(result.config.gasLimit).toBe(

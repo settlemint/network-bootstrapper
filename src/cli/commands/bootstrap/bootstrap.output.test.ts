@@ -257,7 +257,7 @@ const toAllocationConfigMapName = (address: string): string =>
 
 const genesisService = new BesuGenesisService(TEST_CHAIN_ID);
 const sampleGenesis = genesisService.generate(
-  ALGORITHM.QBFT,
+  ALGORITHM.qbft,
   {
     chainId: TEST_CHAIN_ID,
     faucetWalletAddress: sampleFaucet.address,
@@ -527,9 +527,9 @@ describe("outputResult", () => {
         (entry) => entry.name === "besu-subgraph"
       );
       expect(subgraphConfig?.immutable).toBe(true);
-      // Kubernetes configmaps store the raw IPFS hash; local file output adds the kit: prefix.
+      // Kubernetes ConfigMaps store the kit-prefixed hash to match local file output.
       expect(subgraphConfig?.data?.[SUBGRAPH_HASH_KEY]).toBe(
-        SAMPLE_SUBGRAPH_HASH
+        `kit:${SAMPLE_SUBGRAPH_HASH}`
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;

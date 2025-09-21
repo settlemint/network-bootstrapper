@@ -24,7 +24,7 @@ const baseConfig = {
 
 describe("BesuGenesisService", () => {
   test("generate builds base genesis", () => {
-    const genesis = service.generate(ALGORITHM.QBFT, baseConfig);
+    const genesis = service.generate(ALGORITHM.qbft, baseConfig);
 
     expect(genesis.config.chainId).toBe(CHAIN_ID);
     expect(genesis.gasLimit).toBe(GAS_LIMIT);
@@ -37,7 +37,7 @@ describe("BesuGenesisService", () => {
       [FAUCET]: { balance: "0x02" as const },
     };
     const withContracts = service.generate(
-      ALGORITHM.QBFT,
+      ALGORITHM.qbft,
       baseConfig,
       overrides
     );
@@ -45,7 +45,7 @@ describe("BesuGenesisService", () => {
   });
 
   test("generate configures IBFT consensus", () => {
-    const genesis = service.generate(ALGORITHM.IBFTv2, baseConfig);
+    const genesis = service.generate(ALGORITHM.ibftV2, baseConfig);
     const consensus = genesis.config.ibft2;
     expect(consensus).toBeDefined();
     expect(consensus?.blockperiodseconds).toBe(baseConfig.secondsPerBlock);
@@ -56,7 +56,7 @@ describe("BesuGenesisService", () => {
   });
 
   test("generate configures QBFT consensus", () => {
-    const genesis = service.generate(ALGORITHM.QBFT, baseConfig);
+    const genesis = service.generate(ALGORITHM.qbft, baseConfig);
     const consensus = genesis.config.qbft;
     expect(consensus).toBeDefined();
     expect(consensus?.blockperiodseconds).toBe(baseConfig.secondsPerBlock);
@@ -66,9 +66,9 @@ describe("BesuGenesisService", () => {
   test("private helpers expose consensus configuration", () => {
     const bft = (
       service as unknown as {
-        generateBFT: (config: typeof baseConfig) => unknown;
+        generateBft: (config: typeof baseConfig) => unknown;
       }
-    ).generateBFT(baseConfig);
+    ).generateBft(baseConfig);
     expect(
       (bft as { requesttimeoutseconds: number }).requesttimeoutseconds
     ).toBeGreaterThan(0);
@@ -80,7 +80,7 @@ describe("BesuGenesisService", () => {
           config: typeof baseConfig
         ) => unknown;
       }
-    ).buildConsensusConfig(ALGORITHM.IBFTv2, baseConfig);
+    ).buildConsensusConfig(ALGORITHM.ibftV2, baseConfig);
     expect(consensus).toHaveProperty("ibft2");
 
     const alloc = (
@@ -94,7 +94,7 @@ describe("BesuGenesisService", () => {
     expect(alloc).toHaveProperty(FAUCET);
   });
 
-  const algorithms: Algorithm[] = [ALGORITHM.IBFTv2, ALGORITHM.QBFT];
+  const algorithms: Algorithm[] = [ALGORITHM.ibftV2, ALGORITHM.qbft];
 
   for (const algorithm of algorithms) {
     test(`computeExtraData for ${algorithm}`, () => {

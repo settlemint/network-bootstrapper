@@ -51,6 +51,10 @@ type SecretSpec = SecretEntrySpec;
 const OUTPUT_DIR = "out";
 const MILLISECOND_PAD_WIDTH = 3;
 const ZERO_BALANCE = "0x0";
+const KIT_PREFIX = "kit:";
+
+const formatSubgraphHash = (hash: string): string =>
+  hash.startsWith(KIT_PREFIX) ? hash : `${KIT_PREFIX}${hash}`;
 
 const logNonScreenStep = (message: string): void => {
   process.stdout.write(`${muted(`[bootstrap] ${message}`)}\n`);
@@ -234,7 +238,7 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
       path: join(directory, `${artifactNames.subgraphConfigMapName}.json`),
       description: `${artifactNames.subgraphConfigMapName}.json`,
       contents: `${JSON.stringify(
-        { [SUBGRAPH_HASH_KEY]: `kit:${payload.subgraphHash}` },
+        { [SUBGRAPH_HASH_KEY]: formatSubgraphHash(payload.subgraphHash) },
         null,
         2
       )}\n`,
@@ -295,7 +299,7 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
     configMapSpecs.push({
       name: artifactNames.subgraphConfigMapName,
       key: SUBGRAPH_HASH_KEY,
-      value: payload.subgraphHash,
+      value: formatSubgraphHash(payload.subgraphHash),
       immutable: true,
       onConflict: "skip",
     });

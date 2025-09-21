@@ -182,7 +182,7 @@ describe("CLI command bootstrap", () => {
           contractSizeLimit: undefined,
         });
         return Promise.resolve({
-          algorithm: ALGORITHM.QBFT,
+          algorithm: ALGORITHM.qbft,
           config: {
             chainId: 99,
             faucetWalletAddress: faucetAddress,
@@ -266,7 +266,7 @@ describe("CLI command bootstrap", () => {
       factory,
       promptForCount: () => Promise.resolve(EXPECTED_DEFAULT_VALIDATOR),
       promptForGenesis: async (_service, { faucetAddress }) => ({
-        algorithm: ALGORITHM.QBFT,
+        algorithm: ALGORITHM.qbft,
         config: {
           chainId: 1,
           faucetWalletAddress: faucetAddress,
@@ -312,7 +312,7 @@ describe("CLI command bootstrap", () => {
       factory,
       promptForCount: () => Promise.resolve(EXPECTED_DEFAULT_VALIDATOR),
       promptForGenesis: async (_service, { faucetAddress }) => ({
-        algorithm: ALGORITHM.QBFT,
+        algorithm: ALGORITHM.qbft,
         config: {
           chainId: 1,
           faucetWalletAddress: faucetAddress,
@@ -368,7 +368,7 @@ describe("CLI command bootstrap", () => {
       },
       promptForGenesis: (_service, { preset }) => {
         expect(preset).toEqual({
-          algorithm: ALGORITHM.QBFT,
+          algorithm: ALGORITHM.qbft,
           chainId: 55,
           secondsPerBlock: 3,
           gasLimit: "5000000",
@@ -377,7 +377,7 @@ describe("CLI command bootstrap", () => {
           contractSizeLimit: 10_000,
         });
         return Promise.resolve({
-          algorithm: preset?.algorithm ?? ALGORITHM.QBFT,
+          algorithm: preset?.algorithm ?? ALGORITHM.qbft,
           config: {
             chainId: preset?.chainId ?? 1,
             faucetWalletAddress: expectedAddress(VALIDATOR_RETURN + 1),
@@ -448,7 +448,7 @@ describe("CLI command bootstrap", () => {
         Promise.resolve(provided ?? defaultValue),
       promptForGenesis: (_service, { faucetAddress }) =>
         Promise.resolve({
-          algorithm: ALGORITHM.QBFT,
+          algorithm: ALGORITHM.qbft,
           config: {
             chainId: 77,
             faucetWalletAddress: faucetAddress,
@@ -531,7 +531,7 @@ describe("CLI command bootstrap", () => {
         expect(validatorAddresses).toHaveLength(1);
         expect(faucetAddress).toBe(expectedAddress(2));
         return Promise.resolve({
-          algorithm: ALGORITHM.QBFT,
+          algorithm: ALGORITHM.qbft,
           config: {
             chainId: 123,
             faucetWalletAddress: faucetAddress,
@@ -592,7 +592,7 @@ describe("CLI command bootstrap", () => {
       promptForGenesis: (_service, { preset, autoAcceptDefaults }) => {
         expect(autoAcceptDefaults).toBe(false);
         expect(preset).toEqual({
-          algorithm: ALGORITHM.IBFTv2,
+          algorithm: ALGORITHM.ibftV2,
           chainId: 1234,
           secondsPerBlock: 6,
           gasLimit: "1000000",
@@ -601,7 +601,7 @@ describe("CLI command bootstrap", () => {
           contractSizeLimit: 100_000,
         });
         return Promise.resolve({
-          algorithm: ALGORITHM.IBFTv2,
+          algorithm: ALGORITHM.ibftV2,
           config: {
             chainId: 1234,
             faucetWalletAddress: expectedAddress(validatorOverride + 1),
@@ -624,7 +624,7 @@ describe("CLI command bootstrap", () => {
 
     const options: CliOptions = {
       validators: validatorOverride,
-      consensus: ALGORITHM.IBFTv2,
+      consensus: ALGORITHM.ibftV2,
       chainId: 1234,
       secondsPerBlock: 6,
       gasLimit: "1000000",
@@ -685,7 +685,7 @@ describe("CLI command bootstrap", () => {
       factory: createFactoryStub(),
       promptForCount: () => Promise.resolve(EXPECTED_DEFAULT_VALIDATOR),
       promptForGenesis: async () => ({
-        algorithm: ALGORITHM.QBFT,
+        algorithm: ALGORITHM.qbft,
         config: {
           chainId: 1,
           faucetWalletAddress: expectedAddress(EXPECTED_DEFAULT_VALIDATOR + 1),
@@ -770,7 +770,7 @@ describe("CLI command bootstrap", () => {
         });
 
         return Promise.resolve({
-          algorithm: ALGORITHM.QBFT,
+          algorithm: ALGORITHM.qbft,
           config: {
             chainId: 1,
             faucetWalletAddress: expectedAddress(

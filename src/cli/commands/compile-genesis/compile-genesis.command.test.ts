@@ -33,7 +33,7 @@ const SAMPLE_ACCOUNT: BesuAllocAccount = {
 
 const genesisService = new BesuGenesisService();
 const baseGenesis = genesisService.generate(
-  ALGORITHM.QBFT,
+  ALGORITHM.qbft,
   {
     chainId: 1337,
     faucetWalletAddress: FAUCET_ADDRESS,

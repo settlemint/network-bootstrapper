@@ -546,7 +546,7 @@ const createCliCommand = (
     .option(
       "--consensus <algorithm>",
       `Consensus algorithm (${Object.values(ALGORITHM).join(", ")}). (default: ${
-        ALGORITHM.QBFT
+        ALGORITHM.qbft
       })`,
       (value: string): Algorithm => {
         const normalized = stripSurroundingQuotes(value).toLowerCase();

@@ -3,8 +3,8 @@ import { Hex, Rlp } from "ox";
 type HexString = Hex.Hex;
 
 export const ALGORITHM = {
-  IBFTv2: "IBFTv2",
-  QBFT: "QBFT",
+  ibftV2: "IBFTv2",
+  qbft: "QBFT",
 } as const;
 
 export type Algorithm = (typeof ALGORITHM)[keyof typeof ALGORITHM];
@@ -143,7 +143,7 @@ export class BesuGenesisService {
       Hex.assert(validator, { strict: true });
       return validator as HexString;
     });
-    if (algorithm === ALGORITHM.IBFTv2) {
+    if (algorithm === ALGORITHM.ibftV2) {
       return Rlp.fromHex([VANITY_DATA, normalized, EMPTY_HEX, ROUND_ZERO, []]);
     }
 
@@ -154,14 +154,14 @@ export class BesuGenesisService {
     algorithm: Algorithm,
     config: BesuNetworkConfig
   ): Partial<Pick<BesuGenesisConfig, "ibft2" | "qbft">> {
-    if (algorithm === ALGORITHM.IBFTv2) {
-      return { ibft2: this.generateBFT(config) };
+    if (algorithm === ALGORITHM.ibftV2) {
+      return { ibft2: this.generateBft(config) };
     }
 
-    return { qbft: this.generateBFT(config) };
+    return { qbft: this.generateBft(config) };
   }
 
-  private generateBFT(config: BesuNetworkConfig): BesuBftConfig {
+  private generateBft(config: BesuNetworkConfig): BesuBftConfig {
     const timeout = Math.floor(
       Math.max(MINIMUM_BFT_BLOCK_PERIOD_SECONDS, config.secondsPerBlock) +
         Math.max(
