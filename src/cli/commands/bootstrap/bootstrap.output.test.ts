@@ -353,7 +353,7 @@ describe("outputResult", () => {
       "utf8"
     );
     expect(JSON.parse(subgraphConfig)).toEqual({
-      [SUBGRAPH_HASH_KEY]: SAMPLE_SUBGRAPH_HASH,
+      [SUBGRAPH_HASH_KEY]: `kit:${SAMPLE_SUBGRAPH_HASH}`,
     });
 
     await rm("out", { recursive: true, force: true });
@@ -527,6 +527,7 @@ describe("outputResult", () => {
         (entry) => entry.name === "besu-subgraph"
       );
       expect(subgraphConfig?.immutable).toBe(true);
+      // Kubernetes configmaps store the raw IPFS hash; local file output adds the kit: prefix.
       expect(subgraphConfig?.data?.[SUBGRAPH_HASH_KEY]).toBe(
         SAMPLE_SUBGRAPH_HASH
       );
