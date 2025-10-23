@@ -20,14 +20,17 @@ export class NodeKeyFactory {
 
   /**
    * Generates a fresh private key alongside the derived public key, address,
-   * and exposes the private key again under `enode` for downstream tooling.
+   * and derives the node ID (enode) by stripping the 0x04 prefix from the uncompressed public key.
    */
   generate(): GeneratedNodeKey {
     const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
     const publicKey = account.publicKey;
     const address = account.address;
-    const enode = privateKey;
+    // Derive node ID by stripping the 0x04 prefix from the uncompressed public key
+    const enode = publicKey.startsWith("0x04")
+      ? publicKey.slice(4)
+      : publicKey.slice(2);
 
     return {
       address,
