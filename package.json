@@ -40,7 +40,7 @@
   "dependencies": {
     "@inquirer/prompts": "7.9.0",
     "@kubernetes/client-node": "1.4.0",
-    "commander": "14.0.1",
+    "commander": "14.0.2",
     "multiformats": "13.4.1",
     "lefthook": "1.13.6",
     "ox": "0.9.12",
