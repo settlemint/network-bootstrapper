@@ -9,6 +9,16 @@ export type GeneratedNodeKey = {
 };
 
 /**
+ * Offset to skip the 0x04 uncompressed public key prefix when deriving the node ID.
+ */
+const UNCOMPRESSED_PUBLIC_KEY_PREFIX_LENGTH = 4;
+
+/**
+ * Offset to skip the 0x hex prefix.
+ */
+const HEX_PREFIX_LENGTH = 2;
+
+/**
  * Provides lightweight wrappers around viem's account generation helpers.
  */
 export class NodeKeyFactory {
@@ -29,8 +39,8 @@ export class NodeKeyFactory {
     const address = account.address;
     // Derive node ID by stripping the 0x04 prefix from the uncompressed public key
     const enode = publicKey.startsWith("0x04")
-      ? publicKey.slice(4)
-      : publicKey.slice(2);
+      ? publicKey.slice(UNCOMPRESSED_PUBLIC_KEY_PREFIX_LENGTH)
+      : publicKey.slice(HEX_PREFIX_LENGTH);
 
     return {
       address,
