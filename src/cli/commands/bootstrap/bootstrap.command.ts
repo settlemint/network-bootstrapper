@@ -11,6 +11,10 @@ import { createDownloadAbiCommand } from "../download-abi/download-abi.command.t
 import { loadAbis } from "./bootstrap.abis.ts";
 import { loadAllocations } from "./bootstrap.allocations.ts";
 import {
+  ALL_ARTIFACT_KINDS,
+  parseArtifactList,
+} from "./bootstrap.artifacts-filter.ts";
+import {
   type HexAddress,
   promptForGenesisConfig,
 } from "./bootstrap.genesis-prompts.ts";
@@ -31,6 +35,7 @@ type CliOptions = {
   allocations?: string;
   abiDirectory?: string;
   acceptDefaults?: boolean;
+  artifacts?: string;
   chainId?: number;
   consensus?: Algorithm;
   contractSizeLimit?: number;
@@ -289,6 +294,7 @@ const runBootstrap = async (
     acceptDefaults = false,
     allocations,
     abiDirectory,
+    artifacts: artifactsOption,
     chainId,
     consensus,
     contractSizeLimit,
@@ -420,6 +426,8 @@ const runBootstrap = async (
     ? await deps.loadSubgraphHash(subgraphHashPath)
     : undefined;
 
+  const artifactFilter = parseArtifactList(artifactsOption ?? "");
+
   const { genesis } = await deps.promptForGenesis(deps.service, {
     faucetAddress,
     allocations: allocationOverrides,
@@ -450,6 +458,7 @@ const runBootstrap = async (
     },
     abiArtifacts,
     subgraphHash,
+    artifactFilter,
   };
 
   await deps.outputResult(outputType ?? "screen", payload);
@@ -514,6 +523,11 @@ const createCliCommand = (
     .option(
       "--subgraph-hash-file <path>",
       "Path to a file containing the subgraph IPFS hash.",
+      (value: string) => stripSurroundingQuotes(value)
+    )
+    .option(
+      "--artifacts <list>",
+      `Comma-separated list of artifacts to generate (${ALL_ARTIFACT_KINDS.join(", ")}). (default: all)`,
       (value: string) => stripSurroundingQuotes(value)
     )
     .option(
@@ -630,6 +644,10 @@ const createCliCommand = (
           normalizedOptions.abiDirectory === undefined
             ? undefined
             : stripSurroundingQuotes(normalizedOptions.abiDirectory),
+        artifacts:
+          normalizedOptions.artifacts === undefined
+            ? undefined
+            : stripSurroundingQuotes(normalizedOptions.artifacts),
         subgraphHashFile:
           normalizedOptions.subgraphHashFile === undefined
             ? undefined
@@ -659,6 +677,20 @@ const createCliCommand = (
         const trimmed = sanitizedOptions.abiDirectory.trim();
         sanitizedOptions.abiDirectory =
           trimmed.length === 0 ? undefined : trimmed;
+      }
+
+      if (sanitizedOptions.artifacts) {
+        const trimmed = sanitizedOptions.artifacts.trim();
+        if (trimmed.length > 0) {
+          try {
+            parseArtifactList(trimmed);
+          } catch (error) {
+            throw new InvalidArgumentError(
+              error instanceof Error ? error.message : String(error)
+            );
+          }
+        }
+        sanitizedOptions.artifacts = trimmed.length === 0 ? undefined : trimmed;
       }
 
       if (sanitizedOptions.subgraphHashFile) {
