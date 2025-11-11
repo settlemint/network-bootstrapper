@@ -292,6 +292,13 @@ const samplePayload: OutputPayload = {
   },
   abiArtifacts: SAMPLE_ABI_ARTIFACTS,
   subgraphHash: SAMPLE_SUBGRAPH_HASH,
+  artifactFilter: {
+    genesis: true,
+    keys: true,
+    abis: true,
+    subgraph: true,
+    allocations: true,
+  },
 };
 
 describe("outputResult", () => {

@@ -20,6 +20,7 @@ import {
   toAllocationConfigMapName,
 } from "../../integrations/kubernetes/kubernetes.client.ts";
 import type { AbiArtifact } from "./bootstrap.abis.ts";
+import type { ArtifactFilter } from "./bootstrap.artifacts-filter.ts";
 import { accent, label, muted } from "./bootstrap.colors.ts";
 import { SUBGRAPH_HASH_KEY } from "./bootstrap.subgraph.ts";
 
@@ -43,6 +44,7 @@ type OutputPayload = {
   artifactNames: ArtifactNames;
   abiArtifacts: readonly AbiArtifact[];
   subgraphHash?: string;
+  artifactFilter: ArtifactFilter;
 };
 
 type ConfigMapSpec = ConfigMapEntrySpec;
@@ -154,12 +156,17 @@ const printGenesis = (title: string, genesisJson: string): void => {
 };
 
 const outputToScreen = (payload: OutputPayload): void => {
+  const { artifactFilter } = payload;
   const genesisJson = JSON.stringify(payload.genesis, null, 2);
   process.stdout.write("\n\n");
-  printGenesis("Genesis", genesisJson);
-  printGroup("Validator Nodes", payload.validators);
+  if (artifactFilter.genesis) {
+    printGenesis("Genesis", genesisJson);
+  }
+  if (artifactFilter.keys) {
+    printGroup("Validator Nodes", payload.validators);
+    printFaucet(payload.faucet);
+  }
   printStaticNodes(payload.staticNodes);
-  printFaucet(payload.faucet);
 };
 
 const formatTimestampForDirectory = (date: Date): string => {
@@ -182,58 +189,70 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
   await mkdir(directory, { recursive: true });
   logNonScreenStep(`Created ${directory}`);
 
-  const { artifactNames, abiArtifacts } = payload;
-  const validatorSpecs = createValidatorSpecs(
-    payload.validators,
-    artifactNames.validatorPrefix
-  );
+  const { artifactNames, abiArtifacts, artifactFilter } = payload;
+  const validatorSpecs = artifactFilter.keys
+    ? createValidatorSpecs(payload.validators, artifactNames.validatorPrefix)
+    : [];
 
-  const faucetConfigSpecs = createFaucetConfigSpecs(
-    payload.faucet,
-    artifactNames.faucetPrefix
-  );
-  const faucetSecretSpecs = createFaucetSecretSpecs(
-    payload.faucet,
-    artifactNames.faucetPrefix
-  );
+  const faucetConfigSpecs = artifactFilter.keys
+    ? createFaucetConfigSpecs(payload.faucet, artifactNames.faucetPrefix)
+    : [];
+  const faucetSecretSpecs = artifactFilter.keys
+    ? createFaucetSecretSpecs(payload.faucet, artifactNames.faucetPrefix)
+    : [];
   const faucetSpecs: ConfigMapSpec[] = [
     ...faucetConfigSpecs,
     ...faucetSecretSpecs,
-    {
-      name: `${artifactNames.faucetPrefix}-enode`,
-      key: "enode",
-      value: payload.faucet.enode,
-    },
+    ...(artifactFilter.keys
+      ? [
+          {
+            name: `${artifactNames.faucetPrefix}-enode`,
+            key: "enode",
+            value: payload.faucet.enode,
+          },
+        ]
+      : []),
   ];
 
   const fileEntries: Array<{
     path: string;
     description: string;
     contents: string;
-  }> = [
-    {
+  }> = [];
+
+  if (artifactFilter.genesis) {
+    fileEntries.push({
       path: join(directory, `${artifactNames.genesisConfigMapName}.json`),
       description: `${artifactNames.genesisConfigMapName}.json`,
       contents: `${JSON.stringify(payload.genesis, null, 2)}\n`,
-    },
+    });
+  }
+
+  fileEntries.push(
     ...[...validatorSpecs, ...faucetSpecs].map((spec) => ({
       path: join(directory, spec.name),
       description: spec.name,
       contents: `${JSON.stringify({ [spec.key]: spec.value }, null, 2)}\n`,
-    })),
-    ...abiArtifacts.map((artifact) => ({
-      path: join(directory, `${artifact.configMapName}.json`),
-      description: `${artifact.configMapName}.json`,
-      contents: artifact.contents,
-    })),
-    {
-      path: join(directory, `${artifactNames.staticNodesConfigMapName}.json`),
-      description: `${artifactNames.staticNodesConfigMapName}.json`,
-      contents: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
-    },
-  ];
+    }))
+  );
 
-  if (payload.subgraphHash) {
+  if (artifactFilter.abis) {
+    fileEntries.push(
+      ...abiArtifacts.map((artifact) => ({
+        path: join(directory, `${artifact.configMapName}.json`),
+        description: `${artifact.configMapName}.json`,
+        contents: artifact.contents,
+      }))
+    );
+  }
+
+  fileEntries.push({
+    path: join(directory, `${artifactNames.staticNodesConfigMapName}.json`),
+    description: `${artifactNames.staticNodesConfigMapName}.json`,
+    contents: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
+  });
+
+  if (artifactFilter.subgraph && payload.subgraphHash) {
     fileEntries.push({
       path: join(directory, `${artifactNames.subgraphConfigMapName}.json`),
       description: `${artifactNames.subgraphConfigMapName}.json`,
@@ -259,7 +278,7 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
   const context = await createKubernetesClient();
   const { namespace } = context;
   logNonScreenStep(`Using Kubernetes namespace ${namespace}`);
-  const { artifactNames } = payload;
+  const { artifactNames, artifactFilter } = payload;
   const sparseAlloc = createSparseAlloc(
     payload.genesis.alloc,
     payload.faucet.address
@@ -268,34 +287,47 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
     ...payload.genesis,
     alloc: sparseAlloc,
   };
-  const allocationSpecs = createAllocationConfigSpecs(
-    payload.genesis.alloc,
-    payload.faucet.address
-  );
-  const validatorSpecs = createValidatorSpecs(
-    payload.validators,
-    artifactNames.validatorPrefix
-  );
+  const allocationSpecs = artifactFilter.allocations
+    ? createAllocationConfigSpecs(payload.genesis.alloc, payload.faucet.address)
+    : [];
+  const validatorSpecs = artifactFilter.keys
+    ? createValidatorSpecs(payload.validators, artifactNames.validatorPrefix)
+    : [];
   const allSpecs = [...validatorSpecs];
-  const configMapSpecs = [
-    ...allSpecs.filter((spec) => spec.key !== "privateKey"),
-    ...createFaucetConfigSpecs(payload.faucet, artifactNames.faucetPrefix),
-    {
+  const configMapSpecs: ConfigMapSpec[] = [];
+
+  if (artifactFilter.keys) {
+    configMapSpecs.push(
+      ...allSpecs.filter((spec) => spec.key !== "privateKey")
+    );
+    configMapSpecs.push(
+      ...createFaucetConfigSpecs(payload.faucet, artifactNames.faucetPrefix)
+    );
+  }
+
+  if (artifactFilter.genesis) {
+    configMapSpecs.push({
       name: artifactNames.genesisConfigMapName,
       key: "genesis.json",
       value: `${JSON.stringify(minimalGenesis, null, 2)}\n`,
       immutable: true,
       onConflict: "skip" as const,
-    },
-    {
-      name: artifactNames.staticNodesConfigMapName,
-      key: "static-nodes.json",
-      value: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
-    },
-    ...createAbiConfigSpecs(payload.abiArtifacts),
-    ...allocationSpecs,
-  ];
-  if (payload.subgraphHash) {
+    });
+  }
+
+  configMapSpecs.push({
+    name: artifactNames.staticNodesConfigMapName,
+    key: "static-nodes.json",
+    value: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
+  });
+
+  if (artifactFilter.abis) {
+    configMapSpecs.push(...createAbiConfigSpecs(payload.abiArtifacts));
+  }
+
+  configMapSpecs.push(...allocationSpecs);
+
+  if (artifactFilter.subgraph && payload.subgraphHash) {
     configMapSpecs.push({
       name: artifactNames.subgraphConfigMapName,
       key: SUBGRAPH_HASH_KEY,
@@ -304,10 +336,14 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
       onConflict: "skip",
     });
   }
-  const secretSpecs = [
-    ...allSpecs.filter((spec) => spec.key === "privateKey"),
-    ...createFaucetSecretSpecs(payload.faucet, artifactNames.faucetPrefix),
-  ];
+
+  const secretSpecs: SecretSpec[] = [];
+  if (artifactFilter.keys) {
+    secretSpecs.push(...allSpecs.filter((spec) => spec.key === "privateKey"));
+    secretSpecs.push(
+      ...createFaucetSecretSpecs(payload.faucet, artifactNames.faucetPrefix)
+    );
+  }
 
   logNonScreenStep(
     `Applying ${configMapSpecs.length} ConfigMap specs and ${secretSpecs.length} Secret specs`

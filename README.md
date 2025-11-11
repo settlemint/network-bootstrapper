@@ -43,6 +43,7 @@ Options:
   -a, --allocations <file>               Path to a genesis allocations JSON file. (default: none)
   --abi-directory <path>                 Directory containing ABI JSON files to publish as ConfigMaps.
   --subgraph-hash-file <path>            Path to a file containing the subgraph IPFS hash.
+  --artifacts <list>                     Comma-separated list of artifacts to generate (genesis, keys, abis, subgraph, allocations). (default: all)
   -o, --outputType <type>                Output target (screen, file, kubernetes). (default: "screen")
   --static-node-port <number>            P2P port used for static-nodes enode URIs. (default: 30303)
   --static-node-discovery-port <number>  Discovery port used for static-nodes enode URIs. (default: 30303)
