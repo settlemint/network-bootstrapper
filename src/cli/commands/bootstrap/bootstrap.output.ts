@@ -165,8 +165,8 @@ const outputToScreen = (payload: OutputPayload): void => {
   if (artifactFilter.keys) {
     printGroup("Validator Nodes", payload.validators);
     printFaucet(payload.faucet);
+    printStaticNodes(payload.staticNodes);
   }
-  printStaticNodes(payload.staticNodes);
 };
 
 const formatTimestampForDirectory = (date: Date): string => {
@@ -246,11 +246,13 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
     );
   }
 
-  fileEntries.push({
-    path: join(directory, `${artifactNames.staticNodesConfigMapName}.json`),
-    description: `${artifactNames.staticNodesConfigMapName}.json`,
-    contents: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
-  });
+  if (artifactFilter.keys) {
+    fileEntries.push({
+      path: join(directory, `${artifactNames.staticNodesConfigMapName}.json`),
+      description: `${artifactNames.staticNodesConfigMapName}.json`,
+      contents: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
+    });
+  }
 
   if (artifactFilter.subgraph && payload.subgraphHash) {
     fileEntries.push({
@@ -303,6 +305,11 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
     configMapSpecs.push(
       ...createFaucetConfigSpecs(payload.faucet, artifactNames.faucetPrefix)
     );
+    configMapSpecs.push({
+      name: artifactNames.staticNodesConfigMapName,
+      key: "static-nodes.json",
+      value: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
+    });
   }
 
   if (artifactFilter.genesis) {
@@ -314,12 +321,6 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
       onConflict: "skip" as const,
     });
   }
-
-  configMapSpecs.push({
-    name: artifactNames.staticNodesConfigMapName,
-    key: "static-nodes.json",
-    value: `${JSON.stringify(payload.staticNodes, null, 2)}\n`,
-  });
 
   if (artifactFilter.abis) {
     configMapSpecs.push(...createAbiConfigSpecs(payload.abiArtifacts));

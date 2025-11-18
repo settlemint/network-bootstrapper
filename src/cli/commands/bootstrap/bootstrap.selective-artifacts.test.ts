@@ -130,11 +130,24 @@ describe("Selective artifact generation - screen output", () => {
     expect(output).not.toContain("Genesis");
   });
 
-  test("includes static nodes regardless of filter", async () => {
+  test("excludes static nodes when keys filter is disabled", async () => {
     output = "";
     const filter: ArtifactFilter = {
       genesis: false,
       keys: false,
+      abis: false,
+      subgraph: false,
+      allocations: false,
+    };
+    await outputResult("screen", createSamplePayload(filter));
+    expect(output).not.toContain("Static Nodes");
+  });
+
+  test("includes static nodes when keys filter is enabled", async () => {
+    output = "";
+    const filter: ArtifactFilter = {
+      genesis: false,
+      keys: true,
       abis: false,
       subgraph: false,
       allocations: false,
@@ -224,7 +237,7 @@ describe("Selective artifact generation - file output", () => {
     expect(output).toContain("besu-subgraph");
   });
 
-  test("always writes static nodes regardless of filter", async () => {
+  test("skips static nodes file when keys filter is disabled", async () => {
     const filter: ArtifactFilter = {
       genesis: false,
       keys: false,
@@ -236,7 +249,23 @@ describe("Selective artifact generation - file output", () => {
     const payload = createSamplePayload(filter);
     await outputResult("file", payload);
 
-    // Should always log about static nodes
+    // Should not log about static nodes when keys are disabled
+    expect(output).not.toContain("static-nodes");
+  });
+
+  test("writes static nodes file when keys filter is enabled", async () => {
+    const filter: ArtifactFilter = {
+      genesis: false,
+      keys: true,
+      abis: false,
+      subgraph: false,
+      allocations: false,
+    };
+    output = "";
+    const payload = createSamplePayload(filter);
+    await outputResult("file", payload);
+
+    // Should log about static nodes when keys are enabled
     expect(output).toContain("static-nodes");
   });
 });
