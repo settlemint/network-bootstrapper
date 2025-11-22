@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.20
 
-FROM oven/bun:1.3.2-debian AS builder
+FROM oven/bun:1.3.3-debian AS builder
 WORKDIR /app
 
 COPY bun.lock package.json tsconfig.json ./
