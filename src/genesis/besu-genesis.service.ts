@@ -36,7 +36,6 @@ type BesuGenesisConfig = {
   readonly berlinBlock: number;
   readonly londonBlock: number;
   readonly shanghaiTime: number;
-  readonly cancunTime: number;
   readonly zeroBaseFee: boolean;
   readonly contractSizeLimit?: number;
   readonly evmStackSize?: number;
@@ -118,7 +117,6 @@ export class BesuGenesisService {
         berlinBlock: 0,
         londonBlock: 0,
         shanghaiTime: 0,
-        cancunTime: 0,
         zeroBaseFee: (config.gasPrice ?? 0) === 0,
         contractSizeLimit: config.contractSizeLimit,
         evmStackSize: config.evmStackSize,
