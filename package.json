@@ -38,7 +38,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@inquirer/prompts": "8.0.1",
+    "@inquirer/prompts": "8.0.2",
     "@kubernetes/client-node": "1.4.0",
     "commander": "14.0.2",
     "multiformats": "13.4.1",
