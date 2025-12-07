@@ -57,6 +57,7 @@ const createServiceStub = () => {
       berlinBlock: 0,
       londonBlock: 0,
       shanghaiTime: 0,
+      cancunTime: 0,
       zeroBaseFee: true,
     },
     nonce: "0x0",

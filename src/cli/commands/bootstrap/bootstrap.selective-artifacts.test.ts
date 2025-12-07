@@ -49,6 +49,7 @@ const createSamplePayload = (filter: ArtifactFilter): OutputPayload => ({
       berlinBlock: 0,
       muirGlacierBlock: 0,
       shanghaiTime: 0,
+      cancunTime: 0,
       zeroBaseFee: false,
       qbft: {
         blockperiodseconds: 5,
