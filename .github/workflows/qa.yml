@@ -97,9 +97,7 @@ jobs:
           disable_node: "true"
 
       - name: Login to GitHub Container Registry
-        if: |
-          github.event_name == 'push' ||
-          (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ghcr.io
