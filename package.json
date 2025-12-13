@@ -42,7 +42,7 @@
     "@kubernetes/client-node": "1.4.0",
     "commander": "14.0.2",
     "multiformats": "13.4.1",
-    "lefthook": "2.0.9",
+    "lefthook": "2.0.11",
     "ox": "0.9.17",
     "viem": "2.41.2",
     "yaml": "2.8.2",
