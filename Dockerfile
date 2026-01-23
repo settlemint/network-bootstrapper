@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.20
+# syntax=docker/dockerfile:1.21
 
 FROM oven/bun:1.3.6-debian AS builder
 WORKDIR /app
