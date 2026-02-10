@@ -332,7 +332,7 @@ describe("outputResult", () => {
         "besu-faucet-enode",
         "besu-faucet-private-key",
         "besu-faucet-pubkey",
-        "besu-node-validator-0-address",
+        "besu-node-validator-0-node-address",
         "besu-node-validator-0-enode",
         "besu-node-validator-0-private-key",
         "besu-node-validator-0-pubkey",
@@ -452,7 +452,7 @@ describe("outputResult", () => {
       expect(createdConfigMaps).toHaveLength(EXPECTED_CONFIGMAP_COUNT);
       expect(createdSecrets).toHaveLength(EXPECTED_SECRET_COUNT);
       const mapNames = createdConfigMaps.map((entry) => entry.name).sort();
-      expect(mapNames).toContain("besu-node-validator-0-address");
+      expect(mapNames).toContain("besu-node-validator-0-node-address");
       expect(mapNames).toContain("besu-genesis");
       expect(mapNames).toContain("besu-faucet-address");
       expect(mapNames).toContain("besu-faucet-pubkey");
@@ -576,7 +576,7 @@ describe("outputResult", () => {
       const expectedConfigMaps = [
         "custom-genesis",
         "custom-static",
-        "custom-validator-0-address",
+        "custom-validator-0-node-address",
         "custom-validator-0-enode",
         "custom-validator-0-pubkey",
         "custom-faucet-address",
@@ -636,7 +636,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "ConfigMap besu-node-validator-0-address already exists. Delete it or choose a different output target."
+        "ConfigMap besu-node-validator-0-node-address already exists. Delete it or choose a different output target."
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -825,7 +825,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "Failed to create ConfigMap besu-node-validator-0-address: boom"
+        "Failed to create ConfigMap besu-node-validator-0-node-address: boom"
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -864,7 +864,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "Failed to create ConfigMap besu-node-validator-0-address: failed"
+        "Failed to create ConfigMap besu-node-validator-0-node-address: failed"
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -905,7 +905,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "Failed to create ConfigMap besu-node-validator-0-address: unknown error"
+        "Failed to create ConfigMap besu-node-validator-0-node-address: unknown error"
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
@@ -946,7 +946,7 @@ describe("outputResult", () => {
         }) as unknown as ReturnType<typeof Bun.file>;
 
       await expect(outputResult("kubernetes", samplePayload)).rejects.toThrow(
-        "Failed to create ConfigMap besu-node-validator-0-address: denied"
+        "Failed to create ConfigMap besu-node-validator-0-node-address: denied"
       );
     } finally {
       (KubeConfig.prototype as any).loadFromCluster = originalLoad;
