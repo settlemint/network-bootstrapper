@@ -125,7 +125,7 @@ const printGroup = (title: string, nodes: readonly IndexedNode[]): void => {
   process.stdout.write(`${accent(title)}\n`);
   for (const node of nodes) {
     process.stdout.write(`  ${label(`#${node.index}`)}\n`);
-    process.stdout.write(`    address: ${node.address}\n`);
+    process.stdout.write(`    nodeAddress: ${node.address}\n`);
     process.stdout.write(`    publicKey: ${node.publicKey}\n`);
     process.stdout.write(`    privateKey: ${node.privateKey}\n`);
     process.stdout.write(`    enode: ${node.enode}\n`);
@@ -381,7 +381,7 @@ const createValidatorSpecs = (
     const ordinal = node.index - 1;
     const base = `${validatorPrefix}-${ordinal}`;
     return [
-      { name: `${base}-address`, key: "address", value: node.address },
+      { name: `${base}-node-address`, key: "nodeAddress", value: node.address },
       {
         name: `${base}-private-key`,
         key: "privateKey",
