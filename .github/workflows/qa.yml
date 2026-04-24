@@ -17,10 +17,11 @@ on:
         closed,
       ]
   pull_request_review:
-    types: [submitted, dismissed]
+    types: [ submitted, dismissed ]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}-${{ github.event.action || 'default' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref
+    }}-${{ github.event_name }}-${{ github.event.action || 'default' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -89,12 +90,12 @@ jobs:
           slack_channel_id: ${{ env.SLACK_CHANNEL_ID }}
 
       # Setup dependencies for QA (skip for draft PRs)
-      - name: Setup dependencies
-        uses: settlemint/shared-actions/.github/actions/setup-dependencies@e6f1bf8860111910c2ec9538e9edc137f39e8ef1 # main
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          npm_token: ${{ env.NPM_TOKEN }}
-          disable_node: "true"
+      # - name: Setup dependencies
+      #   uses: settlemint/shared-actions/.github/actions/setup-dependencies@e6f1bf8860111910c2ec9538e9edc137f39e8ef1 # main
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     npm_token: ${{ env.NPM_TOKEN }}
+      #     disable_node: "true"
 
       - name: Login to GitHub Container Registry
         if: |
@@ -213,9 +214,8 @@ jobs:
         uses: settlemint/shared-actions/.github/actions/build-status-labeler@e6f1bf8860111910c2ec9538e9edc137f39e8ef1 # main
         with:
           pr_number: ${{ github.event.pull_request.number }}
-          workflow_status:
-            ${{ steps.secret-scan.outcome == 'success' && 'success' || 'failure'
-            }}
+          workflow_status: ${{ steps.secret-scan.outcome == 'success' && 'success' ||
+            'failure' }}
 
       # Check PR review status (PR and PR review events only)
       - name: Check PR review status
