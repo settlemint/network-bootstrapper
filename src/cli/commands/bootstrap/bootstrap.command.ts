@@ -43,6 +43,7 @@ type CliOptions = {
   gasLimit?: string;
   gasPrice?: number;
   validators?: number;
+  rpcNodes?: number;
   outputType?: OutputType;
   secondsPerBlock?: number;
   staticNodeDomain?: string;
@@ -51,6 +52,8 @@ type CliOptions = {
   staticNodeDiscoveryPort?: number;
   staticNodeServiceName?: string;
   staticNodePodPrefix?: string;
+  rpcNodeServiceName?: string;
+  rpcNodePodPrefix?: string;
   genesisConfigmapName?: string;
   staticNodesConfigmapName?: string;
   faucetArtifactPrefix?: string;
@@ -70,10 +73,13 @@ type BootstrapDependencies = {
 };
 
 const DEFAULT_VALIDATOR_COUNT = 4;
+const DEFAULT_RPC_NODE_COUNT = 2;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
 const {
   staticNodeServiceName: DEFAULT_STATIC_NODE_SERVICE_NAME,
   staticNodePodPrefix: DEFAULT_STATIC_NODE_POD_PREFIX,
+  rpcNodeServiceName: DEFAULT_RPC_NODE_SERVICE_NAME,
+  rpcNodePodPrefix: DEFAULT_RPC_NODE_POD_PREFIX,
   genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
   staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
   faucetArtifactPrefix: DEFAULT_FAUCET_ARTIFACT_PREFIX,
@@ -163,6 +169,8 @@ type TextOptionKey =
   | "staticNodeNamespace"
   | "staticNodeServiceName"
   | "staticNodePodPrefix"
+  | "rpcNodeServiceName"
+  | "rpcNodePodPrefix"
   | "genesisConfigmapName"
   | "staticNodesConfigmapName"
   | "faucetArtifactPrefix";
@@ -205,6 +213,21 @@ const TEXT_OPTION_DESCRIPTORS: TextOptionDescriptor<TextOptionKey>[] = [
     flag: "--static-node-pod-prefix <prefix>",
     description:
       "StatefulSet prefix used when constructing validator pod hostnames.",
+    parser: stripSurroundingQuotes,
+    sanitize: (value) => stripSurroundingQuotes(value),
+  },
+  {
+    key: "rpcNodeServiceName",
+    flag: "--rpc-node-service-name <name>",
+    description:
+      "Headless Service name used when constructing RPC static-nodes hostnames.",
+    parser: stripSurroundingQuotes,
+    sanitize: (value) => stripSurroundingQuotes(value),
+  },
+  {
+    key: "rpcNodePodPrefix",
+    flag: "--rpc-node-pod-prefix <prefix>",
+    description: "StatefulSet prefix used when constructing RPC pod hostnames.",
     parser: stripSurroundingQuotes,
     sanitize: (value) => stripSurroundingQuotes(value),
   },
@@ -304,12 +327,15 @@ const runBootstrap = async (
     outputType,
     secondsPerBlock,
     validators: validatorOption,
+    rpcNodes: rpcNodesOption,
     staticNodeDomain: staticNodeDomainOption,
     staticNodeNamespace: staticNodeNamespaceOption,
     staticNodePort: staticNodePortOption,
     staticNodeDiscoveryPort: staticNodeDiscoveryPortOption,
     staticNodeServiceName: staticNodeServiceNameOption,
     staticNodePodPrefix: staticNodePodPrefixOption,
+    rpcNodeServiceName: rpcNodeServiceNameOption,
+    rpcNodePodPrefix: rpcNodePodPrefixOption,
     genesisConfigmapName: genesisConfigmapNameOption,
     staticNodesConfigmapName: staticNodesConfigmapNameOption,
     faucetArtifactPrefix: faucetArtifactPrefixOption,
@@ -356,6 +382,12 @@ const runBootstrap = async (
     DEFAULT_VALIDATOR_COUNT
   );
 
+  const rpcNodesCount = await resolveCount(
+    "RPC nodes",
+    rpcNodesOption,
+    DEFAULT_RPC_NODE_COUNT
+  );
+
   const staticNodeServiceName = await resolveText(
     "Static node service name",
     staticNodeServiceNameOption,
@@ -366,6 +398,18 @@ const runBootstrap = async (
     "Static node pod prefix",
     staticNodePodPrefixOption,
     DEFAULT_STATIC_NODE_POD_PREFIX
+  );
+
+  const rpcNodeServiceName = await resolveText(
+    "RPC node service name",
+    rpcNodeServiceNameOption,
+    DEFAULT_RPC_NODE_SERVICE_NAME
+  );
+
+  const rpcNodePodPrefix = await resolveText(
+    "RPC node pod prefix",
+    rpcNodePodPrefixOption,
+    DEFAULT_RPC_NODE_POD_PREFIX
   );
 
   const genesisConfigMapName = await resolveText(
@@ -387,8 +431,9 @@ const runBootstrap = async (
   );
 
   const validators = generateGroup(deps.factory, validatorsCount);
+  const rpcNodes = generateGroup(deps.factory, rpcNodesCount);
   const faucet = deps.factory.generate();
-  const staticNodes = createStaticNodeEntries(validators, {
+  const validatorStaticNodes = createStaticNodeEntries(validators, {
     namespace: staticNodeNamespaceOption,
     domain: staticNodeDomainOption,
     serviceName: staticNodeServiceName,
@@ -396,6 +441,15 @@ const runBootstrap = async (
     port: staticNodePortOption ?? DEFAULT_STATIC_NODE_PORT,
     discoveryPort: staticNodeDiscoveryPortOption ?? DEFAULT_STATIC_NODE_PORT,
   });
+  const rpcStaticNodes = createStaticNodeEntries(rpcNodes, {
+    namespace: staticNodeNamespaceOption,
+    domain: staticNodeDomainOption,
+    serviceName: rpcNodeServiceName,
+    podPrefix: rpcNodePodPrefix,
+    port: staticNodePortOption ?? DEFAULT_STATIC_NODE_PORT,
+    discoveryPort: staticNodeDiscoveryPortOption ?? DEFAULT_STATIC_NODE_PORT,
+  });
+  const staticNodes = [...validatorStaticNodes, ...rpcStaticNodes];
 
   const validatorAddresses = validators.map<HexAddress>((node) => node.address);
 
@@ -448,10 +502,12 @@ const runBootstrap = async (
     faucet,
     genesis,
     validators,
+    rpcNodes,
     staticNodes,
     artifactNames: {
       faucetPrefix: faucetArtifactPrefix,
       validatorPrefix: staticNodePodPrefix,
+      rpcPrefix: rpcNodePodPrefix,
       genesisConfigMapName,
       staticNodesConfigMapName,
       subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,
@@ -510,6 +566,12 @@ const createCliCommand = (
       "Number of validator nodes to generate.",
       createCountParser("Validators"),
       DEFAULT_VALIDATOR_COUNT
+    )
+    .option(
+      "-r, --rpc-nodes <count>",
+      "Number of RPC nodes to generate.",
+      createCountParser("RPC nodes"),
+      DEFAULT_RPC_NODE_COUNT
     )
     .option(
       "-a, --allocations <file>",
@@ -618,6 +680,10 @@ const createCliCommand = (
           cmd.getOptionValueSource("validators") === "default"
             ? undefined
             : options.validators,
+        rpcNodes:
+          cmd.getOptionValueSource("rpcNodes") === "default"
+            ? undefined
+            : options.rpcNodes,
         staticNodePort:
           cmd.getOptionValueSource("staticNodePort") === "default"
             ? undefined

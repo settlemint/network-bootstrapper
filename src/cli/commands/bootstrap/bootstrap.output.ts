@@ -31,6 +31,7 @@ type OutputType = "screen" | "file" | "kubernetes";
 type ArtifactNames = {
   faucetPrefix: string;
   validatorPrefix: string;
+  rpcPrefix: string;
   genesisConfigMapName: string;
   staticNodesConfigMapName: string;
   subgraphConfigMapName: string;
@@ -40,6 +41,7 @@ type OutputPayload = {
   faucet: GeneratedNodeKey;
   genesis: BesuGenesis;
   validators: readonly IndexedNode[];
+  rpcNodes: readonly IndexedNode[];
   staticNodes: readonly string[];
   artifactNames: ArtifactNames;
   abiArtifacts: readonly AbiArtifact[];
@@ -164,6 +166,7 @@ const outputToScreen = (payload: OutputPayload): void => {
   }
   if (artifactFilter.keys) {
     printGroup("Validator Nodes", payload.validators);
+    printGroup("RPC Nodes", payload.rpcNodes);
     printFaucet(payload.faucet);
     printStaticNodes(payload.staticNodes);
   }
@@ -191,7 +194,10 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
 
   const { artifactNames, abiArtifacts, artifactFilter } = payload;
   const validatorSpecs = artifactFilter.keys
-    ? createValidatorSpecs(payload.validators, artifactNames.validatorPrefix)
+    ? createNodeArtifactSpecs(payload.validators, artifactNames.validatorPrefix)
+    : [];
+  const rpcSpecs = artifactFilter.keys
+    ? createNodeArtifactSpecs(payload.rpcNodes, artifactNames.rpcPrefix)
     : [];
 
   const faucetConfigSpecs = artifactFilter.keys
@@ -229,7 +235,7 @@ const outputToFile = async (payload: OutputPayload): Promise<string> => {
   }
 
   fileEntries.push(
-    ...[...validatorSpecs, ...faucetSpecs].map((spec) => ({
+    ...[...validatorSpecs, ...rpcSpecs, ...faucetSpecs].map((spec) => ({
       path: join(directory, spec.name),
       description: spec.name,
       contents: `${JSON.stringify({ [spec.key]: spec.value }, null, 2)}\n`,
@@ -293,9 +299,12 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
     ? createAllocationConfigSpecs(payload.genesis.alloc, payload.faucet.address)
     : [];
   const validatorSpecs = artifactFilter.keys
-    ? createValidatorSpecs(payload.validators, artifactNames.validatorPrefix)
+    ? createNodeArtifactSpecs(payload.validators, artifactNames.validatorPrefix)
     : [];
-  const allSpecs = [...validatorSpecs];
+  const rpcSpecs = artifactFilter.keys
+    ? createNodeArtifactSpecs(payload.rpcNodes, artifactNames.rpcPrefix)
+    : [];
+  const allSpecs = [...validatorSpecs, ...rpcSpecs];
   const configMapSpecs: ConfigMapSpec[] = [];
 
   if (artifactFilter.keys) {
@@ -372,14 +381,14 @@ const outputToKubernetes = async (payload: OutputPayload): Promise<void> => {
   );
 };
 
-const createValidatorSpecs = (
+const createNodeArtifactSpecs = (
   nodes: readonly IndexedNode[],
-  validatorPrefix: string
+  prefix: string
 ): ConfigMapSpec[] =>
   nodes.flatMap<ConfigMapSpec>((node) => {
     // Align artifact names with 0-indexed StatefulSet pod ordinals.
     const ordinal = node.index - 1;
-    const base = `${validatorPrefix}-${ordinal}`;
+    const base = `${prefix}-${ordinal}`;
     return [
       { name: `${base}-node-address`, key: "nodeAddress", value: node.address },
       {

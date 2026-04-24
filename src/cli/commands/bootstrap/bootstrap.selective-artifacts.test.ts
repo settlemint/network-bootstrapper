@@ -80,10 +80,12 @@ const createSamplePayload = (filter: ArtifactFilter): OutputPayload => ({
       enode: "enode://validator1@host:30303",
     },
   ],
+  rpcNodes: [],
   staticNodes: ["enode://validator1@host:30303"],
   artifactNames: {
     faucetPrefix: "faucet",
-    validatorPrefix: "besu-node-validator",
+    validatorPrefix: "besu-validators",
+    rpcPrefix: "besu-rpc",
     genesisConfigMapName: "genesis",
     staticNodesConfigMapName: "static-nodes",
     subgraphConfigMapName: ARTIFACT_DEFAULTS.subgraphConfigMapName,
