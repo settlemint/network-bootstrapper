@@ -11,15 +11,20 @@ import type { OutputPayload, OutputType } from "./bootstrap.output.ts";
 import { outputResult as realOutputResult } from "./bootstrap.output.ts";
 
 const VALIDATOR_LABEL = "validator nodes";
+const RPC_LABEL = "RPC nodes";
 const VALIDATOR_RETURN = 2;
+const RPC_RETURN = 2;
 const GENESIS_MARKER = '"extraData": "0xextra"';
 const EXPECTED_DEFAULT_VALIDATOR = 4;
+const EXPECTED_DEFAULT_RPC = 2;
 const DEFAULT_STATIC_NODE_PORT = 30_303;
 const CUSTOM_STATIC_NODE_PORT = 40_000;
 const LEADING_DOT_REGEX = /^\./u;
 const {
   staticNodeServiceName: DEFAULT_SERVICE_NAME,
   staticNodePodPrefix: DEFAULT_POD_PREFIX,
+  rpcNodeServiceName: DEFAULT_RPC_SERVICE_NAME,
+  rpcNodePodPrefix: DEFAULT_RPC_POD_PREFIX,
   genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
   staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
   faucetArtifactPrefix: DEFAULT_FAUCET_PREFIX,
@@ -35,7 +40,9 @@ const PRIVATE_KEY_REPEAT = 32;
 const PUBLIC_KEY_REPEAT = 64;
 const FIRST_VALIDATOR_INDEX = 1;
 const SECOND_VALIDATOR_INDEX = 2;
-const FAUCET_INDEX = VALIDATOR_RETURN + 1;
+const FIRST_RPC_FACTORY_INDEX = VALIDATOR_RETURN + 1;
+const SECOND_RPC_FACTORY_INDEX = VALIDATOR_RETURN + 2;
+const FAUCET_INDEX = VALIDATOR_RETURN + RPC_RETURN + 1;
 const SAMPLE_SUBGRAPH_HASH =
   "bafybeigdyrztzd4gufq2bdsd6we3jh7uzulnd2ipkyli5sto6f5j6rlude";
 const createFactoryStub = () => {
@@ -71,14 +78,15 @@ const expectedPublicKey = (index: number) => {
   return `0x04${pattern.repeat(PUBLIC_KEY_REPEAT)}` as const;
 };
 
-const expectedStaticNodeUri = (
-  index: number,
-  domain?: string,
-  port: number = DEFAULT_STATIC_NODE_PORT,
-  discoveryPort: number = DEFAULT_STATIC_NODE_PORT,
-  namespace?: string,
-  serviceName: string = DEFAULT_SERVICE_NAME,
-  podPrefix: string = DEFAULT_POD_PREFIX
+const buildStaticNodeUri = (
+  publicKeyIndex: number,
+  ordinal: number,
+  domain: string | undefined,
+  port: number,
+  discoveryPort: number,
+  namespace: string | undefined,
+  serviceName: string,
+  podPrefix: string
 ): string => {
   const normalizedDomain =
     domain === undefined || domain.trim().length === 0
@@ -88,7 +96,6 @@ const expectedStaticNodeUri = (
     namespace === undefined || namespace.trim().length === 0
       ? undefined
       : namespace.trim();
-  const ordinal = index - 1;
   const podName = `${podPrefix}-${ordinal}`;
   const segments = [podName, serviceName];
   if (normalizedNamespace) {
@@ -98,7 +105,7 @@ const expectedStaticNodeUri = (
     segments.push(normalizedDomain);
   }
   const host = segments.join(".");
-  const publicKey = expectedPublicKey(index).slice(2);
+  const publicKey = expectedPublicKey(publicKeyIndex).slice(2);
   const nodeId =
     publicKey.startsWith(UNCOMPRESSED_PUBLIC_KEY_PREFIX) &&
     publicKey.length === UNCOMPRESSED_PUBLIC_KEY_LENGTH
@@ -106,6 +113,47 @@ const expectedStaticNodeUri = (
       : publicKey;
   return `enode://${nodeId}@${host}:${port}?discport=${discoveryPort}`;
 };
+
+const expectedStaticNodeUri = (
+  index: number,
+  domain?: string,
+  port: number = DEFAULT_STATIC_NODE_PORT,
+  discoveryPort: number = DEFAULT_STATIC_NODE_PORT,
+  namespace?: string,
+  serviceName: string = DEFAULT_SERVICE_NAME,
+  podPrefix: string = DEFAULT_POD_PREFIX
+): string =>
+  buildStaticNodeUri(
+    index,
+    index - 1,
+    domain,
+    port,
+    discoveryPort,
+    namespace,
+    serviceName,
+    podPrefix
+  );
+
+const expectedRpcStaticNodeUri = (
+  publicKeyIndex: number,
+  ordinal: number,
+  domain?: string,
+  port: number = DEFAULT_STATIC_NODE_PORT,
+  discoveryPort: number = DEFAULT_STATIC_NODE_PORT,
+  namespace?: string,
+  serviceName: string = DEFAULT_RPC_SERVICE_NAME,
+  podPrefix: string = DEFAULT_RPC_POD_PREFIX
+): string =>
+  buildStaticNodeUri(
+    publicKeyIndex,
+    ordinal,
+    domain,
+    port,
+    discoveryPort,
+    namespace,
+    serviceName,
+    podPrefix
+  );
 
 const captureStdout = () => {
   let captured = "";
@@ -220,10 +268,13 @@ describe("CLI command bootstrap", () => {
 
     expect(promptCalls).toEqual([
       [VALIDATOR_LABEL, undefined, EXPECTED_DEFAULT_VALIDATOR],
+      [RPC_LABEL, undefined, EXPECTED_DEFAULT_RPC],
     ]);
     expect(textPromptCalls).toEqual([
       ["Static node service name", DEFAULT_SERVICE_NAME],
       ["Static node pod prefix", DEFAULT_POD_PREFIX],
+      ["RPC node service name", DEFAULT_RPC_SERVICE_NAME],
+      ["RPC node pod prefix", DEFAULT_RPC_POD_PREFIX],
       ["Genesis ConfigMap name", DEFAULT_GENESIS_CONFIGMAP_NAME],
       ["Static nodes ConfigMap name", DEFAULT_STATIC_NODES_CONFIGMAP_NAME],
       ["Faucet artifact prefix", DEFAULT_FAUCET_PREFIX],
@@ -231,6 +282,7 @@ describe("CLI command bootstrap", () => {
     const output = stdout.read();
     expect(output).toContain("Genesis");
     expect(output).toContain("Validator Nodes");
+    expect(output).toContain("RPC Nodes");
     expect(output).toContain("Static Nodes");
     expect(output).toContain(GENESIS_MARKER);
     expect(loadAllocationsPath).toBe("/tmp/alloc.json");
@@ -239,11 +291,14 @@ describe("CLI command bootstrap", () => {
     expect(outputInvocation?.payload.staticNodes).toEqual([
       expectedStaticNodeUri(FIRST_VALIDATOR_INDEX),
       expectedStaticNodeUri(SECOND_VALIDATOR_INDEX),
+      expectedRpcStaticNodeUri(FIRST_RPC_FACTORY_INDEX, 0),
+      expectedRpcStaticNodeUri(SECOND_RPC_FACTORY_INDEX, 1),
     ]);
     expect(outputInvocation?.payload.abiArtifacts).toEqual([]);
     expect(outputInvocation?.payload.artifactNames).toEqual({
       faucetPrefix: DEFAULT_FAUCET_PREFIX,
       validatorPrefix: DEFAULT_POD_PREFIX,
+      rpcPrefix: DEFAULT_RPC_POD_PREFIX,
       genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
       staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
       subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,
@@ -407,6 +462,8 @@ describe("CLI command bootstrap", () => {
         "generate",
         "--validators",
         "2",
+        "--rpc-nodes",
+        "2",
         "--allocations",
         "/tmp/mock.json",
         "--consensus",
@@ -489,6 +546,12 @@ describe("CLI command bootstrap", () => {
         "custom-service",
         "--static-node-pod-prefix",
         "custom-validator",
+        "--rpc-nodes",
+        "1",
+        "--rpc-node-service-name",
+        "custom-rpc-service",
+        "--rpc-node-pod-prefix",
+        "custom-rpc",
         "--genesis-configmap-name",
         "custom-genesis",
         "--static-nodes-configmap-name",
@@ -509,10 +572,21 @@ describe("CLI command bootstrap", () => {
         "custom-service",
         "custom-validator"
       ),
+      expectedRpcStaticNodeUri(
+        2,
+        0,
+        "svc.cluster.local",
+        CUSTOM_STATIC_NODE_PORT,
+        0,
+        "network",
+        "custom-rpc-service",
+        "custom-rpc"
+      ),
     ]);
     expect(capturedPayload?.artifactNames).toEqual({
       faucetPrefix: "custom-faucet",
       validatorPrefix: "custom-validator",
+      rpcPrefix: "custom-rpc",
       genesisConfigMapName: "custom-genesis",
       staticNodesConfigMapName: "custom-static-nodes",
       subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,
@@ -556,6 +630,7 @@ describe("CLI command bootstrap", () => {
     await runBootstrap(
       {
         validators: 1,
+        rpcNodes: 0,
         staticNodeDomain: "svc.cluster.local",
         staticNodeNamespace: "network",
         staticNodePort: CUSTOM_STATIC_NODE_PORT,
@@ -624,6 +699,7 @@ describe("CLI command bootstrap", () => {
 
     const options: CliOptions = {
       validators: validatorOverride,
+      rpcNodes: 0,
       consensus: ALGORITHM.ibftV2,
       chainId: 1234,
       secondsPerBlock: 6,
@@ -795,9 +871,11 @@ describe("CLI command bootstrap", () => {
       loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
       outputResult: (_type, payload) => {
         expect(payload.validators).toHaveLength(EXPECTED_DEFAULT_VALIDATOR);
+        expect(payload.rpcNodes).toHaveLength(EXPECTED_DEFAULT_RPC);
         expect(payload.artifactNames).toEqual({
           faucetPrefix: DEFAULT_FAUCET_PREFIX,
           validatorPrefix: DEFAULT_POD_PREFIX,
+          rpcPrefix: DEFAULT_RPC_POD_PREFIX,
           genesisConfigMapName: DEFAULT_GENESIS_CONFIGMAP_NAME,
           staticNodesConfigMapName: DEFAULT_STATIC_NODES_CONFIGMAP_NAME,
           subgraphConfigMapName: DEFAULT_SUBGRAPH_CONFIGMAP_NAME,

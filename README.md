@@ -36,10 +36,13 @@ Options:
   --static-node-namespace <name>         Namespace segment inserted between service name and domain for static-nodes entries.
   --static-node-service-name <name>      Headless Service name used when constructing static-nodes hostnames.
   --static-node-pod-prefix <prefix>      StatefulSet prefix used when constructing validator pod hostnames.
+  --rpc-node-service-name <name>         Headless Service name used when constructing RPC static-nodes hostnames.
+  --rpc-node-pod-prefix <prefix>         StatefulSet prefix used when constructing RPC pod hostnames.
   --genesis-configmap-name <name>        ConfigMap name that stores the generated genesis.json payload.
   --static-nodes-configmap-name <name>   ConfigMap name that stores the generated static-nodes.json payload.
   --faucet-artifact-prefix <prefix>      Prefix applied to faucet ConfigMaps and Secrets.
   -v, --validators <count>               Number of validator nodes to generate. (default: 4)
+  -r, --rpc-nodes <count>                Number of RPC nodes to generate. (default: 2)
   -a, --allocations <file>               Path to a genesis allocations JSON file. (default: none)
   --abi-directory <path>                 Directory containing ABI JSON files to publish as ConfigMaps.
   --subgraph-hash-file <path>            Path to a file containing the subgraph IPFS hash.
