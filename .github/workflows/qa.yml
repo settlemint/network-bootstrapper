@@ -89,13 +89,13 @@ jobs:
           slack_bot_token: ${{ env.SLACK_BOT_TOKEN }}
           slack_channel_id: ${{ env.SLACK_CHANNEL_ID }}
 
-      # Setup dependencies for QA (skip for draft PRs)
-      # - name: Setup dependencies
-      #   uses: settlemint/shared-actions/.github/actions/setup-dependencies@e6f1bf8860111910c2ec9538e9edc137f39e8ef1 # main
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     npm_token: ${{ env.NPM_TOKEN }}
-      #     disable_node: "true"
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Login to GitHub Container Registry
         if: |
