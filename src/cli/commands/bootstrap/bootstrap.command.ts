@@ -48,6 +48,7 @@ type CliOptions = {
   secondsPerBlock?: number;
   staticNodeDomain?: string;
   staticNodeNamespace?: string;
+  staticNodeFqdn?: boolean;
   staticNodePort?: number;
   staticNodeDiscoveryPort?: number;
   staticNodeServiceName?: string;
@@ -69,6 +70,7 @@ type BootstrapDependencies = {
   loadAllocations: typeof loadAllocations;
   loadAbis: typeof loadAbis;
   loadSubgraphHash: typeof loadSubgraphHash;
+  warn?: (message: string) => void;
   outputResult: (type: OutputType, payload: OutputPayload) => Promise<void>;
 };
 
@@ -87,6 +89,8 @@ const {
 } = ARTIFACT_DEFAULTS;
 const OUTPUT_CHOICES: OutputType[] = ["screen", "file", "kubernetes"];
 const LEADING_DOT_REGEX = /^\./u;
+// `svc` and `cluster.local` suffixes only resolve alongside a namespace segment.
+const CLUSTER_SCOPED_DOMAIN_REGEX = /(^|\.)(svc|cluster\.local)(\.|$)/u;
 const UNCOMPRESSED_PUBLIC_KEY_PREFIX = "04";
 const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 130;
 
@@ -164,6 +168,57 @@ const normalizeStaticNodeNamespace = (
   return trimmed.length === 0 ? undefined : trimmed;
 };
 
+const defaultWarn = (message: string): void => {
+  process.stderr.write(`${message}\n`);
+};
+
+type StaticNodeHostConfig = {
+  namespace?: string;
+  domain?: string;
+};
+
+// An enode that names its own namespace keeps pointing at the original deployment
+// once the network is restored elsewhere, so hostnames stay namespace-relative by
+// default and resolve through the pod's DNS search list.
+const resolveStaticNodeHostConfig = (
+  {
+    namespace,
+    domain,
+    fqdn,
+  }: { namespace?: string; domain?: string; fqdn?: boolean },
+  warn: (message: string) => void
+): StaticNodeHostConfig => {
+  const normalizedNamespace = normalizeStaticNodeNamespace(namespace);
+  const normalizedDomain = normalizeStaticNodeDomain(domain);
+
+  if (fqdn) {
+    if (!normalizedNamespace) {
+      throw new InvalidArgumentError(
+        "--static-node-fqdn requires --static-node-namespace to build a resolvable hostname."
+      );
+    }
+    warn(
+      `Warning: --static-node-fqdn embeds namespace "${normalizedNamespace}" in every static-nodes entry; a restore into a differently named namespace will point these nodes at the original deployment.`
+    );
+    return { namespace: normalizedNamespace, domain: normalizedDomain };
+  }
+
+  if (normalizedNamespace) {
+    warn(
+      "Warning: --static-node-namespace is deprecated and ignored; static-nodes entries use namespace-relative hostnames so a restore into a renamed namespace still forms a cluster. Pass --static-node-fqdn to keep the fully qualified form."
+    );
+  }
+
+  if (normalizedDomain && CLUSTER_SCOPED_DOMAIN_REGEX.test(normalizedDomain)) {
+    warn(
+      `Warning: --static-node-domain "${normalizedDomain}" is cluster-scoped and was dropped; it only resolves alongside a namespace segment. Pass --static-node-fqdn with --static-node-namespace to keep it.`
+    );
+    return {};
+  }
+
+  return { domain: normalizedDomain };
+};
+
 type TextOptionKey =
   | "staticNodeDomain"
   | "staticNodeNamespace"
@@ -188,7 +243,7 @@ const TEXT_OPTION_DESCRIPTORS: TextOptionDescriptor<TextOptionKey>[] = [
     key: "staticNodeDomain",
     flag: "--static-node-domain <domain>",
     description:
-      "DNS suffix appended to validator peer hostnames for static-nodes entries.",
+      "DNS suffix appended to validator peer hostnames for static-nodes entries. Cluster-scoped suffixes are dropped unless --static-node-fqdn is set.",
     parser: stripSurroundingQuotes,
     sanitize: (value) => normalizeStaticNodeDomain(value) ?? undefined,
   },
@@ -196,7 +251,7 @@ const TEXT_OPTION_DESCRIPTORS: TextOptionDescriptor<TextOptionKey>[] = [
     key: "staticNodeNamespace",
     flag: "--static-node-namespace <name>",
     description:
-      "Namespace segment inserted between service name and domain for static-nodes entries.",
+      "Deprecated and ignored unless --static-node-fqdn is set: namespace segment inserted between service name and domain for static-nodes entries.",
     parser: stripSurroundingQuotes,
     sanitize: (value) => normalizeStaticNodeNamespace(value) ?? undefined,
   },
@@ -330,6 +385,7 @@ const runBootstrap = async (
     rpcNodes: rpcNodesOption,
     staticNodeDomain: staticNodeDomainOption,
     staticNodeNamespace: staticNodeNamespaceOption,
+    staticNodeFqdn: staticNodeFqdnOption,
     staticNodePort: staticNodePortOption,
     staticNodeDiscoveryPort: staticNodeDiscoveryPortOption,
     staticNodeServiceName: staticNodeServiceNameOption,
@@ -341,6 +397,16 @@ const runBootstrap = async (
     faucetArtifactPrefix: faucetArtifactPrefixOption,
     subgraphHashFile: subgraphHashFileOption,
   } = options;
+
+  // Resolved before any key material is generated so an unusable hostname fails fast.
+  const staticNodeHost = resolveStaticNodeHostConfig(
+    {
+      namespace: staticNodeNamespaceOption,
+      domain: staticNodeDomainOption,
+      fqdn: staticNodeFqdnOption,
+    },
+    deps.warn ?? defaultWarn
+  );
 
   const resolveCount = (
     label: string,
@@ -434,16 +500,16 @@ const runBootstrap = async (
   const rpcNodes = generateGroup(deps.factory, rpcNodesCount);
   const faucet = deps.factory.generate();
   const validatorStaticNodes = createStaticNodeEntries(validators, {
-    namespace: staticNodeNamespaceOption,
-    domain: staticNodeDomainOption,
+    namespace: staticNodeHost.namespace,
+    domain: staticNodeHost.domain,
     serviceName: staticNodeServiceName,
     podPrefix: staticNodePodPrefix,
     port: staticNodePortOption ?? DEFAULT_STATIC_NODE_PORT,
     discoveryPort: staticNodeDiscoveryPortOption ?? DEFAULT_STATIC_NODE_PORT,
   });
   const rpcStaticNodes = createStaticNodeEntries(rpcNodes, {
-    namespace: staticNodeNamespaceOption,
-    domain: staticNodeDomainOption,
+    namespace: staticNodeHost.namespace,
+    domain: staticNodeHost.domain,
     serviceName: rpcNodeServiceName,
     podPrefix: rpcNodePodPrefix,
     port: staticNodePortOption ?? DEFAULT_STATIC_NODE_PORT,
@@ -618,6 +684,10 @@ const createCliCommand = (
       (value: string) =>
         parseNonNegativeInteger(value, "Static node discovery port"),
       DEFAULT_STATIC_NODE_PORT
+    )
+    .option(
+      "--static-node-fqdn",
+      "Embed --static-node-namespace (and any cluster-scoped --static-node-domain) in static-nodes hostnames. (default: disabled)"
     )
     .option(
       "--consensus <algorithm>",

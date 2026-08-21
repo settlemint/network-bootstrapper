@@ -32,8 +32,8 @@ Usage: network-bootstrapper generate [options]
 Generate node identities, configure consensus, and emit a Besu genesis.
 
 Options:
-  --static-node-domain <domain>          DNS suffix appended to validator peer hostnames for static-nodes entries.
-  --static-node-namespace <name>         Namespace segment inserted between service name and domain for static-nodes entries.
+  --static-node-domain <domain>          DNS suffix appended to validator peer hostnames for static-nodes entries. Cluster-scoped suffixes are dropped unless --static-node-fqdn is set.
+  --static-node-namespace <name>         Deprecated and ignored unless --static-node-fqdn is set: namespace segment inserted between service name and domain for static-nodes entries.
   --static-node-service-name <name>      Headless Service name used when constructing static-nodes hostnames.
   --static-node-pod-prefix <prefix>      StatefulSet prefix used when constructing validator pod hostnames.
   --rpc-node-service-name <name>         Headless Service name used when constructing RPC static-nodes hostnames.
@@ -50,6 +50,7 @@ Options:
   -o, --outputType <type>                Output target (screen, file, kubernetes). (default: "screen")
   --static-node-port <number>            P2P port used for static-nodes enode URIs. (default: 30303)
   --static-node-discovery-port <number>  Discovery port used for static-nodes enode URIs. (default: 30303)
+  --static-node-fqdn                     Embed --static-node-namespace (and any cluster-scoped --static-node-domain) in static-nodes hostnames. (default: disabled)
   --consensus <algorithm>                Consensus algorithm (IBFTv2, QBFT). (default: QBFT)
   --chain-id <number>                    Chain ID for the genesis config. (default: random between 40000 and 50000)
   --seconds-per-block <number>           Block time in seconds. (default: 2)
