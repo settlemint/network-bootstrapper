@@ -1,0 +1,26 @@
+src/cli/commands/bootstrap/bootstrap.command.ts
+  s_60f7091e9696be::t_aa39bbbbde2e98 51,73,92-93,171-221,246,254,388,401-410,503-504,511-512,688-690
+  s_60f7091e9696be::t_01bbcb735cde12 691
+src/cli/commands/bootstrap/bootstrap.command.test.ts
+  s_60f7091e9696be::t_903b5ad3eee711 452-454,526-528,631-633,778-780
+  s_60f7091e9696be::t_7f95213081e87c 547,646,664-777,781-814
+  s_60f7091e9696be::t_426bd43f6153cc 815
+README.md
+  s_60f7091e9696be::t_29c9fd639ceeae 35-36,53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "2d4e38d197347c58e6c4aeb56745cfcc0e48edd2",
+  "prompts": {},
+  "sessions": {
+    "s_60f7091e9696be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da26dc5d-3051-409c-8e91-93c29eafc47a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Oleksandr Hrab <oleksandr@settlemint.com>"
+    }
+  }
+}
