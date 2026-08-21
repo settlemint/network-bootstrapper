@@ -449,6 +449,9 @@ describe("CLI command bootstrap", () => {
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
       loadAbis: () => Promise.resolve([]),
       loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
+      warn: (_message: string) => {
+        // Warnings are asserted in the dedicated static-nodes tests.
+      },
       outputResult: async (type, payload) => {
         await realOutputResult(type, payload);
       },
@@ -520,6 +523,9 @@ describe("CLI command bootstrap", () => {
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
       loadAbis: () => Promise.resolve([]),
       loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
+      warn: (_message: string) => {
+        // Warnings are asserted in the dedicated static-nodes tests.
+      },
       outputResult: (_type, payload) => {
         capturedPayload = payload;
         return Promise.resolve();
@@ -538,6 +544,7 @@ describe("CLI command bootstrap", () => {
         "svc.cluster.local",
         "--static-node-namespace",
         "network",
+        "--static-node-fqdn",
         "--static-node-port",
         "40000",
         "--static-node-discovery-port",
@@ -621,6 +628,9 @@ describe("CLI command bootstrap", () => {
         Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
       loadAbis: () => Promise.resolve([]),
       loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
+      warn: (_message: string) => {
+        // Warnings are asserted in the dedicated static-nodes tests.
+      },
       outputResult: (_type, payload) => {
         capturedPayload = payload;
         return Promise.resolve();
@@ -633,6 +643,7 @@ describe("CLI command bootstrap", () => {
         rpcNodes: 0,
         staticNodeDomain: "svc.cluster.local",
         staticNodeNamespace: "network",
+        staticNodeFqdn: true,
         staticNodePort: CUSTOM_STATIC_NODE_PORT,
         staticNodeDiscoveryPort: 0,
       },
@@ -648,6 +659,158 @@ describe("CLI command bootstrap", () => {
         "network"
       ),
     ]);
+  });
+
+  const createStaticNodeDeps = (
+    onPayload: (payload: OutputPayload) => void,
+    warnings: string[]
+  ): BootstrapDependencies => ({
+    factory: createFactoryStub(),
+    promptForCount: (_label, provided, defaultValue) =>
+      Promise.resolve(provided ?? defaultValue),
+    promptForGenesis: (_service, { faucetAddress }) =>
+      Promise.resolve({
+        algorithm: ALGORITHM.qbft,
+        config: {
+          chainId: 77,
+          faucetWalletAddress: faucetAddress,
+          gasLimit: "0x1",
+          secondsPerBlock: 2,
+        },
+        genesis: { config: {}, extraData: "0xextra" } as any,
+      }),
+    promptForText: passthroughTextPrompt,
+    service: {} as any,
+    loadAllocations: () =>
+      Promise.resolve({} satisfies Record<string, BesuAllocAccount>),
+    loadAbis: () => Promise.resolve([]),
+    loadSubgraphHash: () => Promise.resolve(SAMPLE_SUBGRAPH_HASH),
+    warn: (message: string) => {
+      warnings.push(message);
+    },
+    outputResult: (_type, payload) => {
+      onPayload(payload);
+      return Promise.resolve();
+    },
+  });
+
+  test("runBootstrap drops the namespace and cluster-scoped domain by default", async () => {
+    let capturedPayload: OutputPayload | undefined;
+    const warnings: string[] = [];
+
+    await runBootstrap(
+      {
+        validators: 1,
+        rpcNodes: 1,
+        staticNodeDomain: "svc.cluster.local",
+        staticNodeNamespace: "network",
+      },
+      createStaticNodeDeps((payload) => {
+        capturedPayload = payload;
+      }, warnings)
+    );
+
+    expect(capturedPayload?.staticNodes).toEqual([
+      expectedStaticNodeUri(1),
+      expectedRpcStaticNodeUri(2, 0),
+    ]);
+    expect(
+      warnings.some((message) =>
+        message.includes("--static-node-namespace is deprecated")
+      )
+    ).toBe(true);
+    expect(
+      warnings.some((message) => message.includes("is cluster-scoped"))
+    ).toBe(true);
+  });
+
+  test("runBootstrap keeps a namespace-agnostic domain suffix", async () => {
+    let capturedPayload: OutputPayload | undefined;
+    const warnings: string[] = [];
+
+    await runBootstrap(
+      {
+        validators: 1,
+        rpcNodes: 0,
+        staticNodeDomain: "example.com",
+      },
+      createStaticNodeDeps((payload) => {
+        capturedPayload = payload;
+      }, warnings)
+    );
+
+    expect(capturedPayload?.staticNodes).toEqual([
+      expectedStaticNodeUri(1, "example.com"),
+    ]);
+    expect(warnings).toEqual([]);
+  });
+
+  test("runBootstrap drops a domain that smuggles the namespace in", async () => {
+    let capturedPayload: OutputPayload | undefined;
+    const warnings: string[] = [];
+
+    await runBootstrap(
+      {
+        validators: 1,
+        rpcNodes: 0,
+        staticNodeDomain: "network.svc.cluster.local",
+      },
+      createStaticNodeDeps((payload) => {
+        capturedPayload = payload;
+      }, warnings)
+    );
+
+    expect(capturedPayload?.staticNodes).toEqual([expectedStaticNodeUri(1)]);
+    expect(warnings).toHaveLength(1);
+  });
+
+  test("runBootstrap rejects --static-node-fqdn without a namespace", async () => {
+    const warnings: string[] = [];
+
+    await expect(
+      runBootstrap(
+        {
+          validators: 1,
+          rpcNodes: 0,
+          staticNodeDomain: "svc.cluster.local",
+          staticNodeFqdn: true,
+        },
+        createStaticNodeDeps(() => {
+          // No payload is emitted; the call is expected to reject.
+        }, warnings)
+      )
+    ).rejects.toThrow("--static-node-fqdn requires --static-node-namespace");
+    expect(warnings).toEqual([]);
+  });
+
+  test("runBootstrap warns when the fully qualified form is opted into", async () => {
+    let capturedPayload: OutputPayload | undefined;
+    const warnings: string[] = [];
+
+    await runBootstrap(
+      {
+        validators: 1,
+        rpcNodes: 0,
+        staticNodeDomain: "svc.cluster.local",
+        staticNodeNamespace: "network",
+        staticNodeFqdn: true,
+      },
+      createStaticNodeDeps((payload) => {
+        capturedPayload = payload;
+      }, warnings)
+    );
+
+    expect(capturedPayload?.staticNodes).toEqual([
+      expectedStaticNodeUri(
+        1,
+        "svc.cluster.local",
+        DEFAULT_STATIC_NODE_PORT,
+        DEFAULT_STATIC_NODE_PORT,
+        "network"
+      ),
+    ]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("--static-node-fqdn embeds namespace");
   });
 
   test("runBootstrap bypasses genesis prompts when CLI overrides provided", async () => {
